@@ -93,7 +93,7 @@ function MenuItem({ icon, title, desc, color, onClick }: {
 }
 
 function PresenceBar({ location }: { location: LocationData }) {
-  const score = 40 + 20 + (location.gpsLat ? 20 : 0)
+  const score = location.score
   const label = score >= 60 ? '인증 완료' : '부분 인증'
   const color = score >= 60 ? 'var(--green)' : '#facc15'
   return (

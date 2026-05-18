@@ -27,13 +27,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!userId) return res.status(400).json({ error: 'userId required' })
 
+  const score = 40 + 20 + (gpsLat ? 20 : 0) // checkin(40) + geoip(20) + gps(20)
+
   const user = JSON.stringify({
     userId, displayName, pictureUrl, city, country, countryCode, gpsLat, gpsLon,
-    checkedInAt: Date.now(),
+    score, checkedInAt: Date.now(),
   })
 
   await cmd(['SET', `imin:user:${userId}`, user, 'EX', TTL])
   await cmd(['SADD', 'imin:active', userId])
 
-  return res.status(200).json({ ok: true })
+  return res.status(200).json({ ok: true, score })
 }

@@ -14,6 +14,7 @@ export interface LocationData {
   gpsLat?: number
   gpsLon?: number
   gpsAccuracy?: number
+  score: number
 }
 
 interface Props {
@@ -80,8 +81,9 @@ export default function VerifyPage({ onVerified }: Props) {
       gpsAccuracy: gpsData?.accuracy,
     }
 
+    let score = 40 + 20 + (data.gpsLat ? 20 : 0)
     try {
-      await fetch('/api/checkin', {
+      const res = await fetch('/api/checkin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -91,11 +93,15 @@ export default function VerifyPage({ onVerified }: Props) {
           ...data,
         }),
       })
+      if (res.ok) {
+        const json = await res.json() as { score?: number }
+        if (json.score) score = json.score
+      }
     } catch {
       // API 실패해도 체크인은 진행
     }
 
-    onVerified(data)
+    onVerified({ ...data, score })
   }
 
   return (

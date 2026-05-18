@@ -93,7 +93,7 @@ export default function RafflePage({ location, onBack }: Props) {
   const deadline = raffle.confirmDeadline ?? 0
   const confirmRemaining = Math.max(0, Math.ceil((deadline - now) / 1000))
   const confirmExpired = deadline > 0 && now > deadline
-  const myScore = 40 + 20 + (location.gpsLat ? 20 : 0)
+  const myScore = location.score
 
   return (
     <div className="min-h-dvh flex flex-col" style={{ background: 'var(--bg)' }}>
