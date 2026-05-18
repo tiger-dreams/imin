@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { ChevronLeft, Users, Trophy, Gift, Clock, Lightbulb } from 'lucide-react'
 import type { LocationData } from './VerifyPage'
 import { useLiff } from '../contexts/LiffContext'
+import { useHeartbeat } from '../hooks/useHeartbeat'
 
 interface ActiveUser {
   userId: string
@@ -34,6 +35,7 @@ interface Props {
 
 export default function RafflePage({ location, onBack }: Props) {
   const { profile } = useLiff()
+  useHeartbeat(profile?.userId)
   const [raffle, setRaffle] = useState<RaffleState>({ status: 'idle' })
   const [activeCount, setActiveCount] = useState(0)
   const [confirmed, setConfirmed] = useState(false)
