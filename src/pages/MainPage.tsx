@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Trophy, MapPin, Wifi, CheckCircle, LogOut, ChevronRight } from 'lucide-react'
+import { Trophy, Wifi, CheckCircle, LogOut, ChevronRight, CalendarDays, MessageCircleQuestion, HelpCircle, Presentation, PartyPopper, Info } from 'lucide-react'
 import { useLiff } from '../contexts/LiffContext'
 import type { LocationData } from './VerifyPage'
 import RafflePage from './RafflePage'
@@ -8,17 +8,18 @@ interface Props {
   location: LocationData
 }
 
-type View = 'menu' | 'raffle' | 'map'
+type View = 'menu' | 'raffle'
 
 export default function MainPage({ location }: Props) {
   const { profile, logout } = useLiff()
   const [view, setView] = useState<View>('menu')
 
   if (view === 'raffle') return <RafflePage location={location} onBack={() => setView('menu')} />
-  if (view === 'map') return <MapPage location={location} onBack={() => setView('menu')} />
+
+  const soon = () => alert('준비 중이에요!')
 
   return (
-    <div className="min-h-dvh flex flex-col" style={{ background: 'var(--bg)' }}>
+    <div className="min-h-dvh flex flex-col pb-8" style={{ background: 'var(--bg)' }}>
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-6 pb-2">
         <div>
@@ -50,36 +51,21 @@ export default function MainPage({ location }: Props) {
           </div>
         </div>
 
-        {/* Presence Score 요약 */}
+        {/* Presence Score */}
         <PresenceBar location={location} />
 
         {/* 메뉴 블록들 */}
         <p className="text-xs font-semibold px-1 pt-1" style={{ color: 'var(--text-muted)' }}>FEATURES</p>
 
-        <MenuItem
-          icon={<Trophy size={18} style={{ color: '#facc15' }} />}
-          title="활성 세션 추첨"
-          desc="지금 앱을 열고 있는 사람만 대상"
-          color="#facc15"
-          onClick={() => setView('raffle')}
-        />
-        <MenuItem
-          icon={<MapPin size={18} style={{ color: '#60a5fa' }} />}
-          title="내 위치 지도"
-          desc={`${location.gpsLat?.toFixed(5)}, ${location.gpsLon?.toFixed(5)}`}
-          color="#60a5fa"
-          onClick={() => setView('map')}
-        />
-        <MenuItem
-          icon={<Wifi size={18} style={{ color: '#a78bfa' }} />}
-          title="WiFi 비밀번호"
-          desc="imin2026 / hackday!"
-          color="#a78bfa"
-          onClick={() => {
-            navigator.clipboard?.writeText('hackday!')
-            alert('비밀번호가 클립보드에 복사됐어요!')
-          }}
-        />
+        <MenuItem icon={<Trophy size={18} style={{ color: '#facc15' }} />}     title="활성 세션 추첨"      desc="지금 앱을 열고 있는 사람만 대상"    color="#facc15" onClick={() => setView('raffle')} />
+        <MenuItem icon={<CalendarDays size={18} style={{ color: '#60a5fa' }} />} title="타임 테이블"         desc="세션 일정 보기"                    color="#60a5fa" onClick={soon} />
+        <MenuItem icon={<Presentation size={18} style={{ color: '#a78bfa' }} />} title="발표 슬라이드"       desc="세션별 자료 다운로드"              color="#a78bfa" onClick={soon} />
+        <MenuItem icon={<MessageCircleQuestion size={18} style={{ color: '#f472b6' }} />} title="연사에게 질문하기" desc="익명으로 질문 남기기"         color="#f472b6" onClick={soon} />
+        <MenuItem icon={<PartyPopper size={18} style={{ color: '#fb923c' }} />}  title="이벤트"              desc="현장 이벤트 참여"                  color="#fb923c" onClick={soon} />
+        <MenuItem icon={<HelpCircle size={18} style={{ color: '#34d399' }} />}   title="주최 측에 문의하기"  desc="운영진에게 바로 연락"              color="#34d399" onClick={soon} />
+        <MenuItem icon={<Wifi size={18} style={{ color: '#94a3b8' }} />}         title="WiFi 비밀번호"       desc="탭하면 클립보드에 복사"            color="#94a3b8"
+          onClick={() => { navigator.clipboard?.writeText('hackday!'); alert('복사됐어요: hackday!') }} />
+        <MenuItem icon={<Info size={18} style={{ color: '#64748b' }} />}         title="행사 기타 정보"      desc="장소, 주차, 공지"                  color="#64748b" onClick={soon} />
       </div>
     </div>
   )
@@ -123,35 +109,3 @@ function PresenceBar({ location }: { location: LocationData }) {
   )
 }
 
-function MapPage({ location, onBack }: { location: LocationData; onBack: () => void }) {
-  const lat = location.gpsLat ?? location.geoLat
-  const lon = location.gpsLon ?? location.geoLon
-  return (
-    <div className="min-h-dvh flex flex-col" style={{ background: 'var(--bg)' }}>
-      <div className="flex items-center gap-3 px-5 pt-6 pb-4">
-        <button onClick={onBack} className="p-2 rounded-xl" style={{ background: 'var(--bg-card)' }}>
-          <ChevronRight size={16} className="rotate-180" style={{ color: 'var(--text-muted)' }} />
-        </button>
-        <span className="font-semibold" style={{ color: 'var(--text)' }}>내 위치</span>
-      </div>
-      <div className="flex-1 mx-4 rounded-2xl overflow-hidden" style={{ minHeight: 400 }}>
-        <iframe
-          title="map-full"
-          width="100%"
-          height="100%"
-          style={{ border: 'none', minHeight: 400 }}
-          src={`https://www.openstreetmap.org/export/embed.html?bbox=${lon - 0.005},${lat - 0.005},${lon + 0.005},${lat + 0.005}&layer=mapnik&marker=${lat},${lon}`}
-        />
-      </div>
-      <div className="px-4 py-4 space-y-1">
-        <p className="text-xs text-center font-mono" style={{ color: 'var(--text-muted)' }}>
-          {lat.toFixed(6)}, {lon.toFixed(6)}
-          {location.gpsAccuracy && ` (±${Math.round(location.gpsAccuracy)}m)`}
-        </p>
-        <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
-          {location.city}, {location.region}, {location.country}
-        </p>
-      </div>
-    </div>
-  )
-}
