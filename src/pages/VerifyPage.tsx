@@ -166,7 +166,7 @@ export default function VerifyPage({ onVerified }: Props) {
               className="w-full py-3 rounded-xl text-sm font-semibold active:opacity-80"
               style={{ background: 'var(--green)', color: '#0a0a0a' }}
             >
-              📍 위치 권한 요청
+              위치 권한 요청
             </button>
           )}
           {gpsStatus === 'loading' && <p className="text-sm" style={{ color: 'var(--text-muted)' }}>위치 확인 중...</p>}

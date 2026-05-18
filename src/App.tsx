@@ -3,7 +3,10 @@ import { LiffProvider, useLiff } from './contexts/LiffContext'
 import LoginPage from './pages/LoginPage'
 import VerifyPage from './pages/VerifyPage'
 import MainPage from './pages/MainPage'
+import AdminPage from './pages/AdminPage'
 import type { LocationData } from './pages/VerifyPage'
+
+const isAdmin = window.location.pathname === '/admin'
 
 function AppRoutes() {
   const { isLoggedIn, isInitialized } = useLiff()
@@ -26,6 +29,8 @@ function AppRoutes() {
 }
 
 export default function App() {
+  if (isAdmin) return <AdminPage />
+
   return (
     <LiffProvider>
       <AppRoutes />

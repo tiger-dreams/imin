@@ -39,7 +39,7 @@ export default function LoginPage() {
 
         {isDev && (
           <p className="mt-4 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
-            🛠 Dev mode — LINE 로그인 없이 진행됩니다
+            Dev mode — LINE 로그인 없이 진행됩니다
           </p>
         )}
       </div>
