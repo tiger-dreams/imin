@@ -1,10 +1,13 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useState } from 'react'
 import { LiffProvider, useLiff } from './contexts/LiffContext'
 import LoginPage from './pages/LoginPage'
-import CheckInPage from './pages/CheckInPage'
+import VerifyPage from './pages/VerifyPage'
+import MainPage from './pages/MainPage'
+import type { LocationData } from './pages/VerifyPage'
 
 function AppRoutes() {
   const { isLoggedIn, isInitialized } = useLiff()
+  const [location, setLocation] = useState<LocationData | null>(null)
 
   if (!isInitialized) {
     return (
@@ -17,21 +20,15 @@ function AppRoutes() {
     )
   }
 
-  return (
-    <Routes>
-      <Route path="/login" element={isLoggedIn ? <Navigate to="/" replace /> : <LoginPage />} />
-      <Route path="/" element={isLoggedIn ? <CheckInPage /> : <Navigate to="/login" replace />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  )
+  if (!isLoggedIn) return <LoginPage />
+  if (!location) return <VerifyPage onVerified={setLocation} />
+  return <MainPage location={location} />
 }
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <LiffProvider>
-        <AppRoutes />
-      </LiffProvider>
-    </BrowserRouter>
+    <LiffProvider>
+      <AppRoutes />
+    </LiffProvider>
   )
 }

@@ -20,7 +20,7 @@ export default function LoginPage() {
           className="inline-block mt-4 px-3 py-1 rounded-full text-xs font-medium"
           style={{ background: '#0d2818', color: 'var(--green)', border: '1px solid #166534' }}
         >
-          Tech Week 2026 · Hack Day
+          Tech Week Hackathon Idea Competition KR
         </div>
       </div>
 
