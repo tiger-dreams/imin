@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Trophy, Wifi, CheckCircle, LogOut, ChevronRight, CalendarDays, MessageCircleQuestion, HelpCircle, Presentation, PartyPopper, Info } from 'lucide-react'
 import { useLiff } from '../contexts/LiffContext'
 import type { LocationData } from './VerifyPage'
@@ -10,9 +10,47 @@ interface Props {
 
 type View = 'menu' | 'raffle'
 
+const HEARTBEAT_INTERVAL = 20_000
+
+function useHeartbeat(userId: string | undefined) {
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const beat = () => {
+    if (!userId || document.hidden) return
+    fetch('/api/heartbeat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    }).catch(() => {})
+  }
+
+  useEffect(() => {
+    if (!userId) return
+    beat()
+    timer.current = setInterval(beat, HEARTBEAT_INTERVAL)
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (timer.current) clearInterval(timer.current)
+        timer.current = null
+      } else {
+        beat()
+        timer.current = setInterval(beat, HEARTBEAT_INTERVAL)
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      if (timer.current) clearInterval(timer.current)
+    }
+  }, [userId])
+}
+
 export default function MainPage({ location }: Props) {
   const { profile, logout } = useLiff()
   const [view, setView] = useState<View>('menu')
+  useHeartbeat(profile?.userId)
 
   if (view === 'raffle') return <RafflePage location={location} onBack={() => setView('menu')} />
 
