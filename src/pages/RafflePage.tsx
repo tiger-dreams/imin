@@ -12,14 +12,19 @@ interface ActiveUser {
   score?: number
 }
 
+interface WinnerEntry extends ActiveUser {
+  confirmed?: boolean
+}
+
 type RaffleStatus = 'idle' | 'open' | 'drawing' | 'result'
 
 interface RaffleState {
   status: RaffleStatus
   prize?: string
   count?: number
-  winners?: ActiveUser[]
+  winners?: WinnerEntry[]
   pool?: ActiveUser[]
+  confirmDeadline?: number
 }
 
 interface Props {
@@ -31,6 +36,14 @@ export default function RafflePage({ location, onBack }: Props) {
   const { profile } = useLiff()
   const [raffle, setRaffle] = useState<RaffleState>({ status: 'idle' })
   const [activeCount, setActiveCount] = useState(0)
+  const [confirmed, setConfirmed] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [now, setNow] = useState(Date.now())
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 500)
+    return () => clearInterval(t)
+  }, [])
 
   const fetchState = useCallback(async () => {
     try {
@@ -38,13 +51,21 @@ export default function RafflePage({ location, onBack }: Props) {
         fetch('/api/raffle-state'),
         fetch('/api/active'),
       ])
-      if (raffleRes.ok) setRaffle(await raffleRes.json() as RaffleState)
+      if (raffleRes.ok) {
+        const state = await raffleRes.json() as RaffleState
+        setRaffle(state)
+        // sync confirmed state from server
+        if (state.winners && profile?.userId) {
+          const me = state.winners.find(w => w.userId === profile.userId)
+          if (me?.confirmed) setConfirmed(true)
+        }
+      }
       if (activeRes.ok) {
         const d = await activeRes.json() as { users: ActiveUser[] }
         setActiveCount(d.users.length)
       }
-    } catch { /* 폴백 유지 */ }
-  }, [])
+    } catch { /* keep previous state */ }
+  }, [profile?.userId])
 
   useEffect(() => {
     fetchState()
@@ -52,7 +73,26 @@ export default function RafflePage({ location, onBack }: Props) {
     return () => clearInterval(t)
   }, [fetchState])
 
-  const isWinner = raffle.winners?.some(w => w.userId === profile?.userId)
+  const handleConfirm = async () => {
+    if (!profile?.userId || confirming || confirmed) return
+    setConfirming(true)
+    try {
+      await fetch('/api/raffle-confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: profile.userId }),
+      })
+      setConfirmed(true)
+    } finally {
+      setConfirming(false)
+    }
+  }
+
+  const myWinnerEntry = raffle.winners?.find(w => w.userId === profile?.userId)
+  const isWinner = !!myWinnerEntry
+  const deadline = raffle.confirmDeadline ?? 0
+  const confirmRemaining = Math.max(0, Math.ceil((deadline - now) / 1000))
+  const confirmExpired = deadline > 0 && now > deadline
   const myScore = 40 + 20 + (location.gpsLat ? 20 : 0)
 
   return (
@@ -96,7 +136,19 @@ export default function RafflePage({ location, onBack }: Props) {
         {raffle.status === 'open' && <WaitingState label="추첨 준비됨" desc="앱을 계속 열어두세요. 곧 추첨이 시작됩니다" active />}
         {raffle.status === 'drawing' && <DrawingState />}
         {raffle.status === 'result' && raffle.winners && (
-          <ResultState winners={raffle.winners} isWinner={!!isWinner} prize={raffle.prize} myUserId={profile?.userId} />
+          <>
+            <ResultState
+              winners={raffle.winners}
+              isWinner={isWinner}
+              prize={raffle.prize}
+              myUserId={profile?.userId}
+              confirmed={confirmed}
+              confirmRemaining={confirmRemaining}
+              confirmExpired={confirmExpired}
+              onConfirm={handleConfirm}
+              confirming={confirming}
+            />
+          </>
         )}
       </div>
     </div>
@@ -124,16 +176,58 @@ function DrawingState() {
   )
 }
 
-function ResultState({ winners, isWinner, prize, myUserId }: { winners: ActiveUser[]; isWinner: boolean; prize?: string; myUserId?: string }) {
+function ResultState({
+  winners, isWinner, prize, myUserId,
+  confirmed, confirmRemaining, confirmExpired,
+  onConfirm, confirming,
+}: {
+  winners: WinnerEntry[]
+  isWinner: boolean
+  prize?: string
+  myUserId?: string
+  confirmed: boolean
+  confirmRemaining: number
+  confirmExpired: boolean
+  onConfirm: () => void
+  confirming: boolean
+}) {
   return (
     <div className="space-y-3">
       {/* 내 결과 */}
-      <div className="rounded-2xl p-6 text-center space-y-2" style={{ background: isWinner ? '#0d2818' : 'var(--bg-card)', border: `1px solid ${isWinner ? 'var(--green-dim)' : 'var(--border)'}` }}>
+      <div className="rounded-2xl p-6 text-center space-y-3" style={{ background: isWinner ? '#0d2818' : 'var(--bg-card)', border: `1px solid ${isWinner ? 'var(--green-dim)' : 'var(--border)'}` }}>
         <Trophy size={28} style={{ color: isWinner ? 'var(--green)' : 'var(--text-muted)', margin: '0 auto' }} />
         <p className="text-xl font-bold" style={{ color: isWinner ? 'var(--green)' : 'var(--text)' }}>
           {isWinner ? '당첨되었습니다!' : '아쉽지만 다음 기회에'}
         </p>
         {prize && <p className="text-sm flex items-center justify-center gap-1.5" style={{ color: '#facc15' }}><Gift size={13} />{prize}</p>}
+
+        {/* 당첨자 확인 버튼 영역 */}
+        {isWinner && !confirmed && !confirmExpired && (
+          <div className="space-y-2 pt-1">
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              <span style={{ color: confirmRemaining <= 5 ? '#f87171' : '#facc15', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{confirmRemaining}초</span> 안에 확인하세요!
+            </p>
+            <button
+              onClick={onConfirm}
+              disabled={confirming}
+              className="w-full py-4 rounded-2xl text-xl font-black tracking-tight active:scale-95 transition-transform"
+              style={{ background: 'var(--green)', color: '#0a0a0a', opacity: confirming ? 0.7 : 1 }}
+            >
+              imin!
+            </button>
+          </div>
+        )}
+        {isWinner && confirmed && (
+          <div className="pt-1">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full" style={{ background: '#0d2818', border: '1px solid var(--green-dim)' }}>
+              <div className="w-2 h-2 rounded-full" style={{ background: 'var(--green)' }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--green)' }}>확인 완료!</span>
+            </div>
+          </div>
+        )}
+        {isWinner && !confirmed && confirmExpired && (
+          <p className="text-sm" style={{ color: '#f87171' }}>시간이 초과되었어요</p>
+        )}
       </div>
 
       {/* 당첨자 목록 */}
@@ -150,7 +244,13 @@ function ResultState({ winners, isWinner, prize, myUserId }: { winners: ActiveUs
               <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{w.displayName}</p>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{countryFlag(w.countryCode)} {w.city}</p>
             </div>
-            {w.userId === myUserId && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: '#0d2818', color: 'var(--green)' }}>나</span>}
+            <div className="flex items-center gap-2">
+              {w.confirmed
+                ? <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: '#0d2818', color: 'var(--green)' }}>확인</span>
+                : <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: '#1c1917', color: '#a8a29e' }}>대기</span>
+              }
+              {w.userId === myUserId && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: '#0d2818', color: 'var(--green)' }}>나</span>}
+            </div>
           </div>
         ))}
       </div>
