@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ChevronLeft, Users, Trophy, Gift, Clock } from 'lucide-react'
+import { ChevronLeft, Users, Trophy, Gift, Clock, Lightbulb } from 'lucide-react'
 import type { LocationData } from './VerifyPage'
 import { useLiff } from '../contexts/LiffContext'
 
@@ -133,7 +133,9 @@ export default function RafflePage({ location, onBack }: Props) {
 
         {/* 상태별 UI */}
         {raffle.status === 'idle' && <WaitingState label="추첨 대기 중" desc="호스트가 추첨을 시작하면 자동으로 업데이트돼요" />}
-        {raffle.status === 'open' && <WaitingState label="추첨 준비됨" desc="앱을 계속 열어두세요. 곧 추첨이 시작됩니다" active />}
+        {raffle.status === 'open' && (
+          <OpenState prize={raffle.prize} count={raffle.count} />
+        )}
         {raffle.status === 'drawing' && <DrawingState />}
         {raffle.status === 'result' && raffle.winners && (
           <>
@@ -150,6 +152,48 @@ export default function RafflePage({ location, onBack }: Props) {
             />
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+function OpenState({ prize, count }: { prize?: string; count?: number }) {
+  return (
+    <div className="space-y-3">
+      {/* 상품 공지 */}
+      <div className="rounded-2xl p-5 space-y-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--green-dim)' }}>
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--green)' }} />
+          <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: 'var(--green)' }}>추첨 공지</span>
+        </div>
+
+        <div className="text-center space-y-1 py-2">
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>이번 추첨 상품</p>
+          <p className="text-2xl font-black" style={{ color: 'var(--text)' }}>{prize || '—'}</p>
+        </div>
+
+        <div className="rounded-xl p-3 flex items-center justify-center gap-2" style={{ background: '#0d2818' }}>
+          <Trophy size={15} style={{ color: '#facc15' }} />
+          <span className="text-sm font-bold" style={{ color: '#facc15' }}>당첨 인원 {count ?? 1}명</span>
+        </div>
+      </div>
+
+      {/* 대기 안내 */}
+      <div className="rounded-2xl p-5 space-y-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+        <div className="flex items-center gap-2 pb-1" style={{ borderBottom: '1px solid var(--border)' }}>
+          <Clock size={14} style={{ color: 'var(--text-muted)' }} />
+          <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>추첨 시작 대기 중</span>
+          <div className="ml-auto flex gap-1">{[0,1,2].map(i => <div key={i} className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--green)', animationDelay: `${i * 0.2}s` }} />)}</div>
+        </div>
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>앱을 계속 열어두세요. 호스트가 추첨을 시작하면 자동으로 업데이트됩니다.</p>
+      </div>
+
+      {/* Tip */}
+      <div className="rounded-2xl px-4 py-3 flex gap-3" style={{ background: '#1c1917', border: '1px solid #292524' }}>
+        <Lightbulb size={14} className="shrink-0 mt-0.5" style={{ color: '#facc15' }} />
+        <p className="text-xs leading-relaxed" style={{ color: '#a8a29e' }}>
+          당첨 후 <span style={{ color: '#facc15', fontWeight: 700 }}>15초 이내</span>에 <span style={{ color: '#facc15', fontWeight: 700 }}>imin!</span> 버튼을 눌러야 확정됩니다. 시간 내에 누르지 않으면 다른 분께 기회가 넘어가요.
+        </p>
       </div>
     </div>
   )
