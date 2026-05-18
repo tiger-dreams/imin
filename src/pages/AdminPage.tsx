@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Trophy, Users, RefreshCw, Play, RotateCcw, Gift, Dices, Star, Drama, SpellCheck2, MapPin, CheckCircle, XCircle, RefreshCcw } from 'lucide-react'
+import {
+  Trophy, Users, RefreshCw, Play, RotateCcw, Gift, Dices, Star, Drama, SpellCheck2,
+  MapPin, CheckCircle, XCircle, RefreshCcw, History, ChevronDown, ChevronUp,
+} from 'lucide-react'
 
 interface ActiveUser {
   userId: string
@@ -18,16 +21,36 @@ interface WinnerEntry extends ActiveUser {
 type RaffleMethod = 'random' | 'score' | 'chosung' | 'one-by-one'
 type RaffleStatus = 'idle' | 'open' | 'drawing' | 'result'
 
-interface RaffleState {
+// 서버에서 오는 추첨 진행 상태 (폼 필드와 분리)
+interface RemoteRaffleState {
   status: RaffleStatus
-  prize: string
-  count: number
-  method: RaffleMethod
+  prize?: string
+  count?: number
+  method?: RaffleMethod
   chosung?: string
   winners?: WinnerEntry[]
   pool?: ActiveUser[]
   allowedCities?: string[]
   confirmDeadline?: number
+}
+
+// 로컬 폼 설정 (서버 동기화와 무관)
+interface FormConfig {
+  prize: string
+  count: number
+  method: RaffleMethod
+  chosung: string
+  allowedCities: string[]
+}
+
+interface HistoryEntry {
+  prize: string
+  count: number
+  method: RaffleMethod
+  winners: WinnerEntry[]
+  pool: ActiveUser[]
+  allowedCities?: string[]
+  savedAt: number
 }
 
 const METHOD_OPTIONS: { value: RaffleMethod; label: string; desc: string; icon: React.ReactNode }[] = [
@@ -38,13 +61,17 @@ const METHOD_OPTIONS: { value: RaffleMethod; label: string; desc: string; icon: 
 ]
 
 const CONFIRM_WINDOW_MS = 15000
+const DEFAULT_FORM: FormConfig = { prize: '', count: 1, method: 'random', chosung: '', allowedCities: [] }
 
 export default function AdminPage() {
   const [users, setUsers] = useState<ActiveUser[]>([])
   const [loading, setLoading] = useState(true)
-  const [raffle, setRaffle] = useState<RaffleState>({ status: 'idle', prize: '', count: 1, method: 'random', allowedCities: [] })
+  const [remote, setRemote] = useState<RemoteRaffleState>({ status: 'idle' })
+  const [form, setForm] = useState<FormConfig>(DEFAULT_FORM)
   const [isDrawing, setIsDrawing] = useState(false)
   const [now, setNow] = useState(Date.now())
+  const [history, setHistory] = useState<HistoryEntry[]>([])
+  const [showHistory, setShowHistory] = useState(false)
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 500)
@@ -55,54 +82,53 @@ export default function AdminPage() {
     setLoading(true)
     try {
       const res = await fetch('/api/active')
-      if (res.ok) {
-        const data = await res.json() as { users: ActiveUser[] }
-        setUsers(data.users)
-      }
+      if (res.ok) setUsers(((await res.json()) as { users: ActiveUser[] }).users)
     } finally {
       setLoading(false)
     }
   }, [])
 
-  const fetchRaffleState = useCallback(async () => {
+  const fetchRemote = useCallback(async () => {
     const res = await fetch('/api/raffle-state')
-    if (res.ok) setRaffle(await res.json() as RaffleState)
+    if (res.ok) {
+      const state = await res.json() as RemoteRaffleState
+      setRemote(state)
+      // 폼 필드는 idle일 때만 초기화 — 진행 중엔 덮어쓰지 않음
+      // (의도적으로 서버 상태에서 form을 복원하지 않음)
+    }
+  }, [])
+
+  const fetchHistory = useCallback(async () => {
+    const res = await fetch('/api/raffle-history')
+    if (res.ok) setHistory(((await res.json()) as { history: HistoryEntry[] }).history)
   }, [])
 
   useEffect(() => {
-    fetchUsers()
-    fetchRaffleState()
-    const t = setInterval(() => { fetchUsers(); fetchRaffleState() }, 4000)
+    fetchUsers(); fetchRemote(); fetchHistory()
+    const t = setInterval(() => { fetchUsers(); fetchRemote() }, 4000)
     return () => clearInterval(t)
-  }, [fetchUsers, fetchRaffleState])
+  }, [fetchUsers, fetchRemote, fetchHistory])
 
-  const pushState = async (state: RaffleState) => {
+  const pushRemote = async (state: RemoteRaffleState) => {
     await fetch('/api/raffle-state', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(state),
     })
-    setRaffle(state)
+    setRemote(state)
   }
 
   const uniqueCities = [...new Set(users.map(u => u.city).filter(Boolean))]
 
-  const toggleCity = (city: string) => {
-    setRaffle(r => {
-      const cur = r.allowedCities ?? []
-      return { ...r, allowedCities: cur.includes(city) ? cur.filter(c => c !== city) : [...cur, city] }
-    })
-  }
+  const toggleCity = (city: string) =>
+    setForm(f => ({ ...f, allowedCities: f.allowedCities.includes(city) ? f.allowedCities.filter(c => c !== city) : [...f.allowedCities, city] }))
 
-  const filteredPool = (pool: ActiveUser[]) => {
-    const cities = raffle.allowedCities ?? []
-    if (cities.length === 0) return pool
-    return pool.filter(u => cities.includes(u.city))
-  }
+  const eligiblePool = (pool: ActiveUser[]) =>
+    form.allowedCities.length === 0 ? pool : pool.filter(u => form.allowedCities.includes(u.city))
 
   const startRaffle = () => {
-    const pool = filteredPool(users)
-    pushState({ ...raffle, status: 'open', pool, winners: [] })
+    const pool = eligiblePool(users)
+    pushRemote({ status: 'open', prize: form.prize, count: form.count, method: form.method, chosung: form.chosung, allowedCities: form.allowedCities, pool, winners: [] })
   }
 
   const pickWinners = (pool: ActiveUser[], count: number, method: RaffleMethod): ActiveUser[] => {
@@ -117,27 +143,40 @@ export default function AdminPage() {
   const draw = async () => {
     if (isDrawing) return
     setIsDrawing(true)
-    await pushState({ ...raffle, status: 'drawing' })
+    await pushRemote({ ...remote, status: 'drawing' })
     setTimeout(async () => {
-      const pool = raffle.pool ?? users
-      const winners: WinnerEntry[] = pickWinners(pool, raffle.count, raffle.method).map(w => ({ ...w, confirmed: false }))
-      await pushState({ ...raffle, status: 'result', winners, pool, confirmDeadline: Date.now() + CONFIRM_WINDOW_MS })
+      const pool = remote.pool ?? users
+      const winners: WinnerEntry[] = pickWinners(pool, remote.count ?? 1, remote.method ?? 'random').map(w => ({ ...w, confirmed: false }))
+      await pushRemote({ ...remote, status: 'result', winners, pool, confirmDeadline: Date.now() + CONFIRM_WINDOW_MS })
       setIsDrawing(false)
     }, 2500)
   }
 
   const reroll = async (winnerIdx: number) => {
-    const currentWinners = raffle.winners ?? []
-    const pool = (raffle.pool ?? []).filter(u => !currentWinners.some(w => w.userId === u.userId))
+    const currentWinners = remote.winners ?? []
+    const pool = (remote.pool ?? []).filter(u => !currentWinners.some(w => w.userId === u.userId))
     if (pool.length === 0) return
-    const [replacement] = pickWinners(pool, 1, raffle.method)
-    const newWinners = currentWinners.map((w, i) =>
-      i === winnerIdx ? { ...replacement, confirmed: false } : w
-    )
-    await pushState({ ...raffle, winners: newWinners, confirmDeadline: Date.now() + CONFIRM_WINDOW_MS })
+    const [replacement] = pickWinners(pool, 1, remote.method ?? 'random')
+    const newWinners = currentWinners.map((w, i) => i === winnerIdx ? { ...replacement, confirmed: false } : w)
+    await pushRemote({ ...remote, winners: newWinners, confirmDeadline: Date.now() + CONFIRM_WINDOW_MS })
   }
 
-  const reset = () => pushState({ status: 'idle', prize: '', count: 1, method: 'random', allowedCities: [] })
+  const reset = async () => {
+    // 결과 히스토리 저장
+    if (remote.status === 'result' && remote.winners && remote.winners.length > 0) {
+      await fetch('/api/raffle-history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prize: remote.prize, count: remote.count, method: remote.method,
+          winners: remote.winners, pool: remote.pool, allowedCities: remote.allowedCities,
+        }),
+      })
+      fetchHistory()
+    }
+    await pushRemote({ status: 'idle' })
+    // 폼은 유지 — 사용자가 원할 때만 직접 수정
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#09090b', color: '#f4f4f5', padding: '24px', fontFamily: 'Inter, sans-serif' }}>
@@ -149,11 +188,35 @@ export default function AdminPage() {
             <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>imin <span style={{ color: '#4ade80' }}>Admin</span></h1>
             <p style={{ fontSize: 13, color: '#71717a', marginTop: 4 }}>Tech Week Hackathon Idea Competition KR</p>
           </div>
-          <button onClick={fetchUsers} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: '#18181b', border: '1px solid #27272a', color: '#a1a1aa', cursor: 'pointer', fontSize: 13 }}>
-            <RefreshCw size={13} style={loading ? { animation: 'spin 1s linear infinite' } : {}} />
-            새로고침
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => { setShowHistory(h => !h); if (!showHistory) fetchHistory() }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: showHistory ? '#27272a' : '#18181b', border: '1px solid #27272a', color: '#a1a1aa', cursor: 'pointer', fontSize: 13 }}>
+              <History size={13} /> 기록
+            </button>
+            <button onClick={fetchUsers}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: '#18181b', border: '1px solid #27272a', color: '#a1a1aa', cursor: 'pointer', fontSize: 13 }}>
+              <RefreshCw size={13} style={loading ? { animation: 'spin 1s linear infinite' } : {}} />
+              새로고침
+            </button>
+          </div>
         </div>
+
+        {/* 히스토리 패널 */}
+        {showHistory && (
+          <div style={{ background: '#18181b', borderRadius: 16, padding: 20, border: '1px solid #27272a', marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <History size={14} style={{ color: '#a1a1aa' }} />
+              <span style={{ fontWeight: 600, fontSize: 14 }}>추첨 기록</span>
+              <span style={{ fontSize: 12, color: '#52525b' }}>최근 {history.length}건</span>
+            </div>
+            {history.length === 0
+              ? <p style={{ fontSize: 13, color: '#52525b', textAlign: 'center', padding: '16px 0' }}>추첨 기록이 없습니다</p>
+              : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {history.map((h, i) => <HistoryCard key={i} entry={h} />)}
+                </div>
+            }
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 20 }}>
 
@@ -183,25 +246,28 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* 우: 추첨 설정 */}
+          {/* 우: 추첨 패널 */}
           <div>
-            {raffle.status === 'idle' && (
+            {remote.status === 'idle' && (
               <div style={{ background: '#18181b', borderRadius: 16, padding: 24, border: '1px solid #27272a' }}>
                 <h2 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 600, marginTop: 0, marginBottom: 20 }}>
                   <Trophy size={16} style={{ color: '#facc15' }} /> 추첨 설정
                 </h2>
 
                 <Field label="상품">
-                  <input value={raffle.prize} onChange={e => setRaffle(r => ({ ...r, prize: e.target.value }))}
-                    placeholder="예: 스타벅스 기프티콘" style={inputStyle} />
+                  <input value={form.prize} onChange={e => setForm(f => ({ ...f, prize: e.target.value }))}
+                    placeholder="예: 스타벅스 기프티콘 5만원" style={inputStyle} />
+                  {form.prize && Number(form.prize.replace(/[^0-9]/g, '')) >= 50000 && (
+                    <p style={{ fontSize: 11, color: '#facc15', marginTop: 6 }}>50,000원 이상 — 당첨자 제세공과금 정보 수집 필요</p>
+                  )}
                 </Field>
 
                 <Field label="당첨 인원">
                   <div style={{ display: 'flex', gap: 8 }}>
                     {[1, 2, 3, 5].map(n => (
-                      <button key={n} onClick={() => setRaffle(r => ({ ...r, count: n }))}
+                      <button key={n} onClick={() => setForm(f => ({ ...f, count: n }))}
                         style={{ flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer', border: 'none',
-                          background: raffle.count === n ? '#4ade80' : '#27272a', color: raffle.count === n ? '#09090b' : '#a1a1aa' }}>
+                          background: form.count === n ? '#4ade80' : '#27272a', color: form.count === n ? '#09090b' : '#a1a1aa' }}>
                         {n}명
                       </button>
                     ))}
@@ -211,93 +277,91 @@ export default function AdminPage() {
                 <Field label="추첨 방식">
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                     {METHOD_OPTIONS.map(m => (
-                      <button key={m.value} onClick={() => setRaffle(r => ({ ...r, method: m.value }))}
+                      <button key={m.value} onClick={() => setForm(f => ({ ...f, method: m.value }))}
                         style={{ padding: 14, borderRadius: 12, textAlign: 'left', cursor: 'pointer',
-                          background: raffle.method === m.value ? 'rgba(74,222,128,0.08)' : '#27272a',
-                          border: raffle.method === m.value ? '1px solid #4ade80' : '1px solid #3f3f46' }}>
-                        <div style={{ color: raffle.method === m.value ? '#4ade80' : '#71717a', marginBottom: 6 }}>{m.icon}</div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: raffle.method === m.value ? '#4ade80' : '#e4e4e7' }}>{m.label}</div>
+                          background: form.method === m.value ? 'rgba(74,222,128,0.08)' : '#27272a',
+                          border: form.method === m.value ? '1px solid #4ade80' : '1px solid #3f3f46' }}>
+                        <div style={{ color: form.method === m.value ? '#4ade80' : '#71717a', marginBottom: 6 }}>{m.icon}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: form.method === m.value ? '#4ade80' : '#e4e4e7' }}>{m.label}</div>
                         <div style={{ fontSize: 11, color: '#71717a', marginTop: 3, lineHeight: 1.4 }}>{m.desc}</div>
                       </button>
                     ))}
                   </div>
                 </Field>
 
-                {raffle.method === 'chosung' && (
+                {form.method === 'chosung' && (
                   <Field label="초성 정답">
-                    <input value={raffle.chosung ?? ''} onChange={e => setRaffle(r => ({ ...r, chosung: e.target.value }))}
+                    <input value={form.chosung} onChange={e => setForm(f => ({ ...f, chosung: e.target.value }))}
                       placeholder="예: ㅇㅁ (imin의 초성)" style={inputStyle} />
                   </Field>
                 )}
 
-                {/* 지역 필터 */}
                 {uniqueCities.length > 0 && (
-                  <Field label={<span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><MapPin size={11} />지역 필터 (비워두면 전체)</span> as unknown as string}>
+                  <Field label={<><MapPin size={11} style={{ marginRight: 4 }} />지역 필터 (비워두면 전체)</>}>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {uniqueCities.map(city => {
-                        const selected = (raffle.allowedCities ?? []).includes(city)
-                        const count = users.filter(u => u.city === city).length
+                        const selected = form.allowedCities.includes(city)
+                        const cnt = users.filter(u => u.city === city).length
                         return (
                           <button key={city} onClick={() => toggleCity(city)}
                             style={{ padding: '6px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer', border: 'none',
                               background: selected ? '#4ade80' : '#27272a', color: selected ? '#09090b' : '#a1a1aa', fontWeight: selected ? 700 : 400 }}>
-                            {city} <span style={{ opacity: 0.7 }}>({count})</span>
+                            {city} <span style={{ opacity: 0.7 }}>({cnt})</span>
                           </button>
                         )
                       })}
                     </div>
-                    {(raffle.allowedCities?.length ?? 0) > 0 && (
+                    {form.allowedCities.length > 0 && (
                       <p style={{ fontSize: 11, color: '#4ade80', marginTop: 8 }}>
-                        선택 지역의 {filteredPool(users).length}명만 추첨 대상
+                        선택 지역의 {eligiblePool(users).length}명만 추첨 대상
                       </p>
                     )}
                   </Field>
                 )}
 
-                <button onClick={startRaffle} disabled={users.length === 0}
-                  style={{ width: '100%', padding: '14px 0', borderRadius: 12, fontWeight: 700, fontSize: 15, cursor: users.length === 0 ? 'not-allowed' : 'pointer', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4,
-                    background: users.length === 0 ? '#27272a' : '#4ade80', color: users.length === 0 ? '#52525b' : '#09090b', opacity: users.length === 0 ? 0.5 : 1 }}>
-                  <Play size={16} /> 추첨 시작
+                <button onClick={startRaffle} disabled={users.length === 0 || !form.prize.trim()}
+                  style={{ width: '100%', padding: '14px 0', borderRadius: 12, fontWeight: 700, fontSize: 15, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4,
+                    cursor: users.length === 0 || !form.prize.trim() ? 'not-allowed' : 'pointer',
+                    background: users.length === 0 || !form.prize.trim() ? '#27272a' : '#4ade80',
+                    color: users.length === 0 || !form.prize.trim() ? '#52525b' : '#09090b',
+                    opacity: users.length === 0 || !form.prize.trim() ? 0.5 : 1 }}>
+                  <Play size={16} /> 추첨 공지 안내
                 </button>
+                {!form.prize.trim() && <p style={{ fontSize: 11, color: '#52525b', textAlign: 'center', marginTop: 8 }}>상품명을 입력해야 시작할 수 있습니다</p>}
               </div>
             )}
 
-            {raffle.status === 'open' && (
+            {remote.status === 'open' && (
               <div style={{ background: '#18181b', borderRadius: 16, padding: 24, border: '1px solid #166534', textAlign: 'center' }}>
                 <Users size={32} style={{ color: '#4ade80', margin: '0 auto 12px' }} />
                 <h2 style={{ fontSize: 20, fontWeight: 700, color: '#4ade80', margin: '0 0 8px' }}>참여자 대기 중</h2>
-                {raffle.method === 'chosung'
-                  ? <p style={{ fontSize: 13, color: '#71717a', marginBottom: 4 }}>초성 &ldquo;{raffle.chosung}&rdquo; 정답자만 추첨 풀에 포함됩니다</p>
+                {remote.method === 'chosung'
+                  ? <p style={{ fontSize: 13, color: '#71717a', marginBottom: 4 }}>초성 &ldquo;{remote.chosung}&rdquo; 정답자만 추첨 풀에 포함됩니다</p>
                   : <p style={{ fontSize: 13, color: '#71717a', marginBottom: 4 }}>참여자가 추첨을 기다리고 있습니다</p>}
-                {(raffle.allowedCities?.length ?? 0) > 0 && (
+                {(remote.allowedCities?.length ?? 0) > 0 && (
                   <p style={{ fontSize: 12, color: '#4ade80', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                    <MapPin size={11} /> {raffle.allowedCities!.join(', ')} 지역만 대상
+                    <MapPin size={11} /> {remote.allowedCities!.join(', ')} 지역만 대상
                   </p>
                 )}
-                <div style={{ fontSize: 36, fontWeight: 700, marginBottom: 8 }}>{raffle.pool?.length ?? 0}<span style={{ fontSize: 16, color: '#71717a', marginLeft: 6 }}>명</span></div>
-                {raffle.prize && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#facc15', fontSize: 13, marginBottom: 20 }}><Gift size={14} />{raffle.prize}</div>}
-                <button onClick={draw} disabled={isDrawing || (raffle.pool?.length ?? 0) === 0}
+                <div style={{ fontSize: 36, fontWeight: 700, marginBottom: 8 }}>{remote.pool?.length ?? 0}<span style={{ fontSize: 16, color: '#71717a', marginLeft: 6 }}>명</span></div>
+                {remote.prize && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#facc15', fontSize: 13, marginBottom: 20 }}><Gift size={14} />{remote.prize}</div>}
+                <button onClick={draw} disabled={isDrawing || (remote.pool?.length ?? 0) === 0}
                   style={{ width: '100%', padding: '14px 0', borderRadius: 12, fontWeight: 700, fontSize: 15, cursor: 'pointer', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    background: '#facc15', color: '#09090b', opacity: isDrawing || (raffle.pool?.length ?? 0) === 0 ? 0.4 : 1 }}>
+                    background: '#facc15', color: '#09090b', opacity: isDrawing || (remote.pool?.length ?? 0) === 0 ? 0.4 : 1 }}>
                   <Trophy size={16} /> 지금 추첨!
                 </button>
               </div>
             )}
 
-            {raffle.status === 'drawing' && (
+            {remote.status === 'drawing' && (
               <div style={{ background: '#18181b', borderRadius: 16, padding: 40, border: '1px solid #713f12', textAlign: 'center' }}>
                 <div style={{ width: 64, height: 64, borderRadius: '50%', border: '4px solid #facc15', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
                 <p style={{ fontSize: 18, fontWeight: 700, color: '#facc15' }}>추첨 중...</p>
               </div>
             )}
 
-            {raffle.status === 'result' && raffle.winners && (
-              <ResultPanel
-                raffle={raffle}
-                now={now}
-                onReroll={reroll}
-                onReset={reset}
-              />
+            {remote.status === 'result' && remote.winners && (
+              <ResultPanel raffle={remote} now={now} onReroll={reroll} onReset={reset} />
             )}
           </div>
         </div>
@@ -307,11 +371,40 @@ export default function AdminPage() {
   )
 }
 
+function HistoryCard({ entry }: { entry: HistoryEntry }) {
+  const [open, setOpen] = useState(false)
+  const date = new Date(entry.savedAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const confirmed = entry.winners.filter(w => w.confirmed).length
+  return (
+    <div style={{ borderRadius: 10, background: '#27272a', overflow: 'hidden' }}>
+      <button onClick={() => setOpen(o => !o)}
+        style={{ width: '100%', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', color: '#f4f4f5', textAlign: 'left' }}>
+        <Trophy size={13} style={{ color: '#facc15', flexShrink: 0 }} />
+        <span style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{entry.prize || '(상품 없음)'}</span>
+        <span style={{ fontSize: 11, color: '#71717a' }}>{date}</span>
+        <span style={{ fontSize: 11, color: '#4ade80' }}>{confirmed}/{entry.winners.length}명 확인</span>
+        {open ? <ChevronUp size={13} style={{ color: '#52525b' }} /> : <ChevronDown size={13} style={{ color: '#52525b' }} />}
+      </button>
+      {open && (
+        <div style={{ borderTop: '1px solid #3f3f46', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {entry.winners.map((w, i) => (
+            <div key={w.userId} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+              <span style={{ color: '#facc15', width: 16 }}>{i + 1}</span>
+              <span style={{ flex: 1, color: '#e4e4e7' }}>{w.displayName}</span>
+              <span style={{ color: '#71717a' }}>{countryFlag(w.countryCode)} {w.city}</span>
+              {w.confirmed
+                ? <CheckCircle size={12} style={{ color: '#4ade80' }} />
+                : <XCircle size={12} style={{ color: '#f87171' }} />}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ResultPanel({ raffle, now, onReroll, onReset }: {
-  raffle: RaffleState
-  now: number
-  onReroll: (idx: number) => void
-  onReset: () => void
+  raffle: RemoteRaffleState; now: number; onReroll: (idx: number) => void; onReset: () => void
 }) {
   const deadline = raffle.confirmDeadline ?? 0
   const remaining = Math.max(0, Math.ceil((deadline - now) / 1000))
@@ -324,7 +417,6 @@ function ResultPanel({ raffle, now, onReroll, onReset }: {
         {!expired && <span style={{ fontSize: 14, color: remaining <= 5 ? '#f87171' : '#a1a1aa', fontVariantNumeric: 'tabular-nums' }}>확인 {remaining}s</span>}
       </h2>
       {raffle.prize && <p style={{ textAlign: 'center', fontSize: 13, color: '#facc15', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Gift size={13} />{raffle.prize}</p>}
-
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
         {raffle.winners!.map((w, i) => {
           const canReroll = expired && !w.confirmed
@@ -357,7 +449,7 @@ function ResultPanel({ raffle, now, onReroll, onReset }: {
         })}
       </div>
       <button onClick={onReset} style={{ width: '100%', padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: '1px solid #27272a', background: '#27272a', color: '#a1a1aa', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-        <RotateCcw size={13} /> 초기화
+        <RotateCcw size={13} /> 다음 추첨으로
       </button>
     </div>
   )
