@@ -76,6 +76,7 @@ export default function VerifyPage({ onVerified }: Props) {
       geoLat: geoData.geoLat!,
       geoLon: geoData.geoLon!,
       isp: geoData.isp!,
+      score: 40 + 20 + (gpsData?.lat ? 20 : 0),
       gpsLat: gpsData?.lat,
       gpsLon: gpsData?.lon,
       gpsAccuracy: gpsData?.accuracy,

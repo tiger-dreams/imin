@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Trophy, Users, RefreshCw, Play, RotateCcw, Gift, Dices, Star, Drama, SpellCheck2,
-  MapPin, CheckCircle, XCircle, RefreshCcw, History, ChevronDown, ChevronUp,
+  MapPin, CheckCircle, XCircle, RefreshCcw, History, ChevronDown, ChevronUp, Send,
 } from 'lucide-react'
 
 interface ActiveUser {
@@ -134,7 +134,7 @@ export default function AdminPage() {
   const pickWinners = (pool: ActiveUser[], count: number, method: RaffleMethod): ActiveUser[] => {
     let candidates = [...pool]
     if (method === 'score') {
-      candidates.sort((a, b) => (b.score ?? 40) - (a.score ?? 40))
+      candidates.sort((a, b) => resolveScore(b) - resolveScore(a))
       candidates = candidates.slice(0, Math.max(candidates.length, count * 2))
     }
     return [...candidates].sort(() => Math.random() - 0.5).slice(0, count)
@@ -240,7 +240,7 @@ export default function AdminPage() {
                     <p style={{ fontSize: 13, fontWeight: 500, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.displayName}</p>
                     <p style={{ fontSize: 11, color: '#71717a', margin: 0 }}>{countryFlag(u.countryCode)} {u.city}</p>
                   </div>
-                  <span style={{ fontSize: 12, color: '#4ade80', fontWeight: 700 }}>{u.score ?? 40}pt</span>
+                  <span style={{ fontSize: 12, color: '#4ade80', fontWeight: 700 }}>{resolveScore(u)}pt</span>
                 </div>
               ))}
             </div>
@@ -373,8 +373,24 @@ export default function AdminPage() {
 
 function HistoryCard({ entry }: { entry: HistoryEntry }) {
   const [open, setOpen] = useState(false)
+  const [sending, setSending] = useState<string | null>(null)
   const date = new Date(entry.savedAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   const confirmed = entry.winners.filter(w => w.confirmed).length
+
+  const sendMsg = async (userId: string) => {
+    if (sending) return
+    setSending(userId)
+    try {
+      await fetch('/api/raffle-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, prize: entry.prize }),
+      })
+    } finally {
+      setSending(null)
+    }
+  }
+
   return (
     <div style={{ borderRadius: 10, background: '#27272a', overflow: 'hidden' }}>
       <button onClick={() => setOpen(o => !o)}
@@ -386,7 +402,7 @@ function HistoryCard({ entry }: { entry: HistoryEntry }) {
         {open ? <ChevronUp size={13} style={{ color: '#52525b' }} /> : <ChevronDown size={13} style={{ color: '#52525b' }} />}
       </button>
       {open && (
-        <div style={{ borderTop: '1px solid #3f3f46', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ borderTop: '1px solid #3f3f46', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {entry.winners.map((w, i) => (
             <div key={w.userId} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
               <span style={{ color: '#facc15', width: 16 }}>{i + 1}</span>
@@ -395,6 +411,13 @@ function HistoryCard({ entry }: { entry: HistoryEntry }) {
               {w.confirmed
                 ? <CheckCircle size={12} style={{ color: '#4ade80' }} />
                 : <XCircle size={12} style={{ color: '#f87171' }} />}
+              <button
+                onClick={() => sendMsg(w.userId)}
+                disabled={sending === w.userId}
+                title="LINE 메시지 발송"
+                style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', border: '1px solid #3f3f46', background: '#18181b', color: sending === w.userId ? '#52525b' : '#a1a1aa' }}>
+                <Send size={10} /> {sending === w.userId ? '발송 중' : '발송'}
+              </button>
             </div>
           ))}
         </div>
@@ -468,6 +491,10 @@ function Field({ label, children }: { label: string | React.ReactNode; children:
       {children}
     </div>
   )
+}
+
+function resolveScore(u: { score?: number; gpsLat?: number }) {
+  return u.score ?? (40 + 20 + (u.gpsLat ? 20 : 0))
 }
 
 function countryFlag(code: string) {
