@@ -39,17 +39,17 @@ export default function CheckInPage() {
   const [checkedIn, setCheckedIn] = useState(false)
   const [raffle, setRaffle] = useState<RaffleState>({ status: 'idle', winner: null, pool: DEMO_POOL })
 
-  // GeoIP fetch
+  // GeoIP fetch — ipapi.co supports HTTPS on free tier
   const fetchGeo = useCallback(async () => {
     setGeo(prev => ({ ...prev, status: 'loading' }))
     try {
-      const res = await fetch('https://ip-api.com/json/?fields=status,message,country,countryCode,region,regionName,city,lat,lon,isp,query')
+      const res = await fetch('https://ipapi.co/json/')
       const data = await res.json() as {
-        status: string; country: string; countryCode: string;
-        regionName: string; city: string; lat: number; lon: number; isp: string; query: string
+        ip: string; city: string; region: string; country_name: string;
+        country_code: string; latitude: number; longitude: number; org: string; error?: boolean
       }
-      if (data.status === 'success') {
-        setGeo({ ip: data.query, city: data.city, region: data.regionName, country: data.country, countryCode: data.countryCode, lat: data.lat, lon: data.lon, isp: data.isp, status: 'ok' })
+      if (!data.error) {
+        setGeo({ ip: data.ip, city: data.city, region: data.region, country: data.country_name, countryCode: data.country_code, lat: data.latitude, lon: data.longitude, isp: data.org, status: 'ok' })
       } else {
         setGeo(prev => ({ ...prev, status: 'error' }))
       }
@@ -187,10 +187,10 @@ export default function CheckInPage() {
           {gps.status === 'idle' && (
             <button
               onClick={requestGps}
-              className="w-full py-3 rounded-xl text-sm font-medium transition-opacity active:opacity-70"
-              style={{ background: 'var(--bg-card2)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+              className="w-full py-3 rounded-xl text-sm font-semibold transition-opacity active:opacity-70"
+              style={{ background: 'var(--green)', color: '#0a0a0a' }}
             >
-              위치 권한 요청
+              📍 위치 권한 요청
             </button>
           )}
 
