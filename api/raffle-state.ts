@@ -15,6 +15,7 @@ async function cmd(command: unknown[]) {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
 
   if (req.method === 'GET') {
     if (!REDIS_URL || !REDIS_TOKEN) return res.status(200).json({ status: 'idle' })

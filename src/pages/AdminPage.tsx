@@ -89,7 +89,7 @@ export default function AdminPage() {
   }, [])
 
   const fetchRemote = useCallback(async () => {
-    const res = await fetch('/api/raffle-state')
+    const res = await fetch('/api/raffle-state', { cache: 'no-store' })
     if (res.ok) {
       const state = await res.json() as RemoteRaffleState
       setRemote(state)

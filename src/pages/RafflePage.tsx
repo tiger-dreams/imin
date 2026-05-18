@@ -50,8 +50,8 @@ export default function RafflePage({ location, onBack }: Props) {
   const fetchState = useCallback(async () => {
     try {
       const [raffleRes, activeRes] = await Promise.all([
-        fetch('/api/raffle-state'),
-        fetch('/api/active'),
+        fetch('/api/raffle-state', { cache: 'no-store' }),
+        fetch('/api/active', { cache: 'no-store' }),
       ])
       if (raffleRes.ok) {
         const state = await raffleRes.json() as RaffleState
