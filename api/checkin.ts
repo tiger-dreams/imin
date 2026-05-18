@@ -2,22 +2,22 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL
 const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
-const TTL = 60 * 10 // 10분 비활성 시 만료
+const TTL = 60 * 10 // 10분
 
-async function redis(cmd: unknown[]) {
-  if (!REDIS_URL || !REDIS_TOKEN) return null
+async function cmd(command: unknown[]) {
   const res = await fetch(`${REDIS_URL}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${REDIS_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(cmd),
+    body: JSON.stringify(command),
   })
-  const json = await res.json() as { result: unknown }
-  return json.result
+  return res.json()
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   if (req.method !== 'POST') return res.status(405).end()
+
+  if (!REDIS_URL || !REDIS_TOKEN) return res.status(500).json({ error: 'Redis not configured' })
 
   const { userId, displayName, pictureUrl, city, country, countryCode, gpsLat, gpsLon } = req.body as {
     userId: string; displayName: string; pictureUrl?: string
@@ -32,8 +32,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     checkedInAt: Date.now(),
   })
 
-  await redis(['SET', `imin:user:${userId}`, user, 'EX', TTL])
-  await redis(['SADD', 'imin:active', userId])
+  await cmd(['SET', `imin:user:${userId}`, user, 'EX', TTL])
+  await cmd(['SADD', 'imin:active', userId])
 
   return res.status(200).json({ ok: true })
 }
