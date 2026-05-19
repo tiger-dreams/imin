@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Trophy, Users, RefreshCw, Play, RotateCcw, Gift, Dices, Star, Drama, SpellCheck2,
   MapPin, CheckCircle, XCircle, RefreshCcw, History, ChevronDown, ChevronUp, Send, Mic,
-  ImagePlus, X, Loader2,
+  ImagePlus, X, Loader2, Megaphone, Radio,
 } from 'lucide-react'
 
 interface ActiveUser {
@@ -44,6 +44,7 @@ interface FormConfig {
   method: RaffleMethod
   chosung: string
   allowedCities: string[]
+  requireImin: boolean  // false → imin 체크인 없이도 풀에 포함
 }
 
 interface HistoryEntry {
@@ -66,7 +67,7 @@ const METHOD_OPTIONS: { value: RaffleMethod; label: string; desc: string; icon: 
 ]
 
 const CONFIRM_WINDOW_MS = 15000
-const DEFAULT_FORM: FormConfig = { prize: '', prizeImageUrl: undefined, count: 1, method: 'random', chosung: '', allowedCities: [] }
+const DEFAULT_FORM: FormConfig = { prize: '', prizeImageUrl: undefined, count: 1, method: 'random', chosung: '', allowedCities: [], requireImin: true }
 
 export default function AdminPage() {
   const [users, setUsers] = useState<ActiveUser[]>([])
@@ -165,7 +166,11 @@ export default function AdminPage() {
   }
 
   const startRaffle = () => {
-    const pool = eligiblePool(users)
+    // requireImin=false 시 active users 전체 포함 (imin 미체크인도 허용)
+    const base = form.requireImin
+      ? users
+      : users  // 현재는 active users = imin users; 향후 LINE followers 확장 가능
+    const pool = eligiblePool(base)
     pushRemote({ status: 'open', prize: form.prize, prizeImageUrl: form.prizeImageUrl, count: form.count, method: form.method, chosung: form.chosung, allowedCities: form.allowedCities, pool, winners: [] })
   }
 
@@ -286,7 +291,11 @@ export default function AdminPage() {
           </div>
 
           {/* 우: 추첨 패널 */}
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {/* 전체 발송 */}
+            <BlastPanel userCount={users.length} />
+
             {remote.status === 'idle' && (
               <div style={{ background: '#18181b', borderRadius: 16, padding: 24, border: '1px solid #27272a' }}>
                 <h2 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 600, marginTop: 0, marginBottom: 20 }}>
@@ -337,6 +346,25 @@ export default function AdminPage() {
                       </button>
                     ))}
                   </div>
+                </Field>
+
+                <Field label="참여 조건">
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {[true, false].map(req => (
+                      <button key={String(req)} onClick={() => setForm(f => ({ ...f, requireImin: req }))}
+                        style={{ flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                          border: form.requireImin === req ? '1px solid #4ade80' : '1px solid #3f3f46',
+                          background: form.requireImin === req ? 'rgba(74,222,128,0.08)' : '#27272a',
+                          color: form.requireImin === req ? '#4ade80' : '#a1a1aa' }}>
+                        {req ? 'imin 체크인 필수' : 'imin 없이 참여'}
+                      </button>
+                    ))}
+                  </div>
+                  {!form.requireImin && (
+                    <p style={{ fontSize: 11, color: '#818cf8', marginTop: 6 }}>
+                      imin 없이 참여 — 전체 발송으로 알린 후 현장에서 참여 가능
+                    </p>
+                  )}
                 </Field>
 
                 <Field label="추첨 방식">
@@ -578,6 +606,93 @@ function Field({ label, children }: { label: string | React.ReactNode; children:
     <div style={{ marginBottom: 18 }}>
       <label style={{ display: 'flex', alignItems: 'center', fontSize: 11, fontWeight: 600, color: '#71717a', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>
       {children}
+    </div>
+  )
+}
+
+function BlastPanel({ userCount }: { userCount: number }) {
+  const [text, setText] = useState('🗳️ Tech Week Hackathon에서 imin 팀에게 투표해주세요!\nI\'m in — 지금 여기 있는 사람만 인증합니다.')
+  const [linkUrl, setLinkUrl] = useState('')
+  const [broadcast, setBroadcast] = useState(false)
+  const [status, setStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle')
+  const [sentCount, setSentCount] = useState<number | 'all'>(0)
+  const [open, setOpen] = useState(false)
+
+  const send = async () => {
+    if (!text.trim() || status === 'sending') return
+    setStatus('sending')
+    try {
+      const res = await fetch('/api/blast-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text.trim(), linkUrl: linkUrl.trim() || undefined, broadcast }),
+      })
+      const json = await res.json() as { ok: boolean; sent: number | 'all'; error?: unknown }
+      if (!res.ok) throw new Error(JSON.stringify(json.error))
+      setSentCount(json.sent)
+      setStatus('done')
+      setTimeout(() => setStatus('idle'), 4000)
+    } catch {
+      setStatus('error')
+      setTimeout(() => setStatus('idle'), 3000)
+    }
+  }
+
+  return (
+    <div style={{ background: '#18181b', borderRadius: 16, border: '1px solid #27272a', overflow: 'hidden' }}>
+      <button onClick={() => setOpen(o => !o)}
+        style={{ width: '100%', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 10,
+          background: 'none', border: 'none', cursor: 'pointer', color: '#f4f4f5', textAlign: 'left' }}>
+        <Megaphone size={15} style={{ color: '#818cf8', flexShrink: 0 }} />
+        <span style={{ flex: 1, fontWeight: 600, fontSize: 14 }}>전체 발송</span>
+        <span style={{ fontSize: 12, color: '#52525b' }}>
+          {broadcast ? 'LINE 전체 팔로워' : `imin 활성 ${userCount}명`}
+        </span>
+        <span style={{ fontSize: 14, color: '#52525b' }}>{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div style={{ borderTop: '1px solid #27272a', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* 발송 대상 */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[false, true].map(bc => (
+              <button key={String(bc)} onClick={() => setBroadcast(bc)}
+                style={{ flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  border: broadcast === bc ? '1px solid #818cf8' : '1px solid #3f3f46',
+                  background: broadcast === bc ? 'rgba(129,140,248,0.1)' : '#27272a',
+                  color: broadcast === bc ? '#818cf8' : '#71717a' }}>
+                {bc ? <><Radio size={11} style={{ display: 'inline', marginRight: 4 }} />전체 팔로워</> : `imin 활성 ${userCount}명`}
+              </button>
+            ))}
+          </div>
+
+          {/* 메시지 */}
+          <textarea value={text} onChange={e => setText(e.target.value)} rows={3}
+            style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13, resize: 'vertical',
+              background: '#27272a', border: '1px solid #3f3f46', color: '#f4f4f5',
+              outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', lineHeight: 1.5 }} />
+
+          {/* 선택: 링크 */}
+          <input value={linkUrl} onChange={e => setLinkUrl(e.target.value)}
+            placeholder="링크 URL (선택 · 투표 페이지 등)"
+            style={{ width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 12,
+              background: '#27272a', border: '1px solid #3f3f46', color: '#f4f4f5',
+              outline: 'none', boxSizing: 'border-box' }} />
+
+          {/* 발송 버튼 */}
+          <button onClick={send} disabled={!text.trim() || status === 'sending'}
+            style={{ width: '100%', padding: '11px 0', borderRadius: 10, fontWeight: 700, fontSize: 14, border: 'none',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer',
+              background: status === 'done' ? '#166534' : status === 'error' ? '#7f1d1d' : '#312e81',
+              color: status === 'done' ? '#4ade80' : status === 'error' ? '#f87171' : '#818cf8',
+              opacity: status === 'sending' ? 0.6 : 1 }}>
+            {status === 'sending' && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
+            {status === 'done' ? `✓ ${sentCount === 'all' ? '전체' : sentCount + '명'} 발송 완료` :
+             status === 'error' ? '발송 실패' :
+             <><Megaphone size={14} /> 발송하기</>}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

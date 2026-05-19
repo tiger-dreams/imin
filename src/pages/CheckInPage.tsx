@@ -299,45 +299,50 @@ export default function CheckInPage() {
         {/* Presence Score */}
         <PresenceScore geo={geo} gps={gps} checkedIn={checkedIn} />
 
-        {/* 메시지 월 */}
-        {checkedIn && (
-          <div className="rounded-2xl p-5 space-y-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-            <div className="flex items-center gap-2">
-              <MessageSquare size={16} style={{ color: '#818cf8' }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>한 마디 남기기</span>
-            </div>
-            {sentWallMsg ? (
-              <div className="rounded-xl px-4 py-3 flex items-start gap-3" style={{ background: '#0f0e1c', border: '1px solid #312e81' }}>
-                <span style={{ color: '#818cf8', marginTop: 1 }}>✓</span>
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: '#818cf8' }}>화면에 게시됐어요!</p>
-                  <p className="text-xs mt-0.5" style={{ color: '#52525b' }}>"{sentWallMsg}"</p>
-                </div>
+        {/* 메시지 월 — 체크인 여부 무관하게 항상 표시 */}
+        <div className="rounded-2xl p-5 space-y-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          <div className="flex items-center gap-2">
+            <MessageSquare size={16} style={{ color: '#818cf8' }} />
+            <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>한 마디 남기기</span>
+            <span className="ml-auto text-xs px-2 py-0.5 rounded-full" style={{ background: '#0f0e1c', color: '#818cf8', border: '1px solid #312e81' }}>라이브 월</span>
+          </div>
+          {sentWallMsg ? (
+            <div className="rounded-xl px-4 py-3 flex items-start gap-3" style={{ background: '#0f0e1c', border: '1px solid #312e81' }}>
+              <span style={{ color: '#818cf8', marginTop: 1 }}>✓</span>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: '#818cf8' }}>화면에 게시됐어요!</p>
+                <p className="text-xs mt-0.5" style={{ color: '#52525b' }}>"{sentWallMsg}"</p>
               </div>
-            ) : (
+            </div>
+          ) : (
+            <>
               <div className="flex gap-2">
                 <input
                   value={wallMsg}
                   onChange={e => setWallMsg(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && sendWallMsg()}
-                  placeholder="지금 느끼는 한 마디..."
+                  onKeyDown={e => e.key === 'Enter' && checkedIn && sendWallMsg()}
+                  placeholder={checkedIn ? '지금 느끼는 한 마디...' : '체크인 후 입력 가능'}
                   maxLength={50}
-                  className="flex-1 rounded-xl px-4 text-sm outline-none"
+                  disabled={!checkedIn}
+                  className="flex-1 rounded-xl text-sm outline-none"
                   style={{ background: 'var(--bg-card2)', border: '1px solid var(--border)', color: 'var(--text)',
-                    padding: '11px 14px', fontFamily: 'inherit' }}
+                    padding: '11px 14px', fontFamily: 'inherit', opacity: checkedIn ? 1 : 0.5 }}
                 />
                 <button
                   onClick={sendWallMsg}
-                  disabled={!wallMsg.trim() || sendingWall}
+                  disabled={!checkedIn || !wallMsg.trim() || sendingWall}
                   className="px-4 rounded-xl flex items-center justify-center transition-opacity active:opacity-70 disabled:opacity-30"
-                  style={{ background: '#312e81', border: 'none', cursor: wallMsg.trim() ? 'pointer' : 'default' }}
+                  style={{ background: '#312e81', border: 'none', cursor: checkedIn && wallMsg.trim() ? 'pointer' : 'default' }}
                 >
                   <Send size={15} style={{ color: '#818cf8' }} />
                 </button>
               </div>
-            )}
-          </div>
-        )}
+              {!checkedIn && (
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>I'm in! 버튼을 누른 후 메시지를 남길 수 있어요</p>
+              )}
+            </>
+          )}
+        </div>
 
         {/* 예정 기능 */}
         <div className="rounded-2xl p-5 space-y-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
