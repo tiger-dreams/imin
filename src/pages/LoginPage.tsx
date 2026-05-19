@@ -10,7 +10,7 @@ export default function LoginPage() {
     >
       {/* Logo */}
       <div className="mb-12 text-center animate-fade-up">
-        <img src="/logo.png" alt="imin" className="h-16 mx-auto" />
+        <img src="/logo.png" alt="imin" className="h-16 mx-auto" style={{ filter: 'brightness(0) invert(1)' }} />
         <p className="mt-2 text-base" style={{ color: 'var(--text-muted)' }}>
           I'm in — 지금 여기 있는 사람만 인증한다
         </p>

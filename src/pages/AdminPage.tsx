@@ -179,25 +179,22 @@ export default function AdminPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#09090b', color: '#f4f4f5', padding: '24px', fontFamily: 'Inter, sans-serif' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ minHeight: '100vh', background: '#09090b', color: '#f4f4f5', fontFamily: 'Inter, sans-serif' }} className="admin-root">
+      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px' }}>
 
         {/* 헤더 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <div>
-            <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <img src="/logo.png" alt="imin" style={{ height: 28 }} />
-              <span style={{ color: '#4ade80' }}>Admin</span>
-            </h1>
-            <p style={{ fontSize: 13, color: '#71717a', marginTop: 4 }}>Tech Week Hackathon Idea Competition KR</p>
+            <img src="/logo.png" alt="imin" style={{ height: 32, filter: 'brightness(0) invert(1)' }} />
+            <p style={{ fontSize: 13, color: '#71717a', marginTop: 6, marginBottom: 0 }}>Tech Week Hackathon Idea Competition KR</p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => { setShowHistory(h => !h); if (!showHistory) fetchHistory() }}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: showHistory ? '#27272a' : '#18181b', border: '1px solid #27272a', color: '#a1a1aa', cursor: 'pointer', fontSize: 13 }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, background: showHistory ? '#27272a' : '#18181b', border: '1px solid #27272a', color: '#a1a1aa', cursor: 'pointer', fontSize: 13 }}>
               <History size={13} /> 기록
             </button>
             <button onClick={fetchUsers}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: '#18181b', border: '1px solid #27272a', color: '#a1a1aa', cursor: 'pointer', fontSize: 13 }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, background: '#18181b', border: '1px solid #27272a', color: '#a1a1aa', cursor: 'pointer', fontSize: 13 }}>
               <RefreshCw size={13} style={loading ? { animation: 'spin 1s linear infinite' } : {}} />
               새로고침
             </button>
@@ -221,7 +218,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 20 }}>
+        <div className="admin-grid">
 
           {/* 좌: 활성 접속자 */}
           <div style={{ background: '#18181b', borderRadius: 16, padding: 20, border: '1px solid #27272a' }}>
@@ -232,7 +229,7 @@ export default function AdminPage() {
               </div>
               <span style={{ fontSize: 24, fontWeight: 700, color: '#4ade80' }}>{users.length}</span>
             </div>
-            <div style={{ maxHeight: 480, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="user-list" style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
               {users.length === 0 && <p style={{ fontSize: 13, color: '#52525b', textAlign: 'center', padding: '20px 0' }}>접속자 없음</p>}
               {users.map(u => (
                 <div key={u.userId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: '#27272a' }}>
@@ -369,7 +366,22 @@ export default function AdminPage() {
           </div>
         </div>
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .admin-grid {
+          display: grid;
+          grid-template-columns: 320px 1fr;
+          gap: 20px;
+          align-items: start;
+        }
+        .user-list { max-height: 520px; }
+        @media (max-width: 768px) {
+          .admin-root { font-size: 14px; }
+          .admin-root > div { padding: 16px !important; }
+          .admin-grid { grid-template-columns: 1fr; }
+          .user-list { max-height: 260px; }
+        }
+      `}</style>
     </div>
   )
 }
