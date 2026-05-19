@@ -42,26 +42,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       layout: 'vertical',
       contents: [
         { type: 'text', text: '🎉 축하합니다!', weight: 'bold', size: 'lg', color: '#f4f4f5' },
-        {
-          type: 'text',
-          text: '추첨에 당첨되셨습니다. 상품 수령은 운영진에게 문의해주세요.',
-          size: 'sm', color: '#a1a1aa', margin: 'sm', wrap: true,
-        },
         ...(prize ? [
-          { type: 'separator', margin: 'lg', color: '#27272a' },
           {
-            type: 'box', layout: 'horizontal', margin: 'lg',
+            type: 'box', layout: 'horizontal', margin: 'sm',
             contents: [
               { type: 'text', text: '상품', size: 'sm', color: '#71717a', flex: 1 },
               { type: 'text', text: prize, size: 'sm', color: '#facc15', weight: 'bold', flex: 2, align: 'end', wrap: true },
             ],
           },
         ] : []),
-        { type: 'separator', margin: 'xl', color: '#27272a' },
+        { type: 'separator', margin: 'lg', color: '#27272a' },
+        ...(prizeImageUrl ? [
+          {
+            type: 'text',
+            text: '위 이미지를 터치하면 기프티콘 바코드를 확인할 수 있습니다. 매장에서 바코드를 제시해주세요.',
+            size: 'sm', color: '#a1a1aa', margin: 'md', wrap: true,
+          },
+        ] : [
+          {
+            type: 'text',
+            text: '상품 수령은 운영진에게 문의해주세요.',
+            size: 'sm', color: '#a1a1aa', margin: 'md', wrap: true,
+          },
+        ]),
+        { type: 'separator', margin: 'lg', color: '#27272a' },
         {
           type: 'text',
           text: '☕ 커피 맛있게 드시고, imin team의 Hackday를 응원해주세요! 여러분의 투표가 큰 힘이 됩니다 💚',
-          size: 'xs', color: '#52525b', margin: 'lg', wrap: true,
+          size: 'xs', color: '#52525b', margin: 'md', wrap: true,
         },
       ],
       backgroundColor: '#18181b',
