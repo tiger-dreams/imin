@@ -464,9 +464,9 @@ function MenuItem({ icon, title, desc, color, onClick }: {
 
 // ── 기타 정보 / About 페이지 ─────────────────────────────────────
 const TEAM = [
-  { name: '정덕범 (Tiger)', role: 'Product · Dev', photo: '/team/tiger.jpg' },
-  { name: '최승범', role: 'Design · UX', photo: '/team/seungbeom.jpg' },
-  { name: '김진선', role: 'Planning · PM', photo: '/team/jinseun.jpg' },
+  { name: '정덕범', role: 'VoIP Platform Dev', photo: '/team/tiger.jpg' },
+  { name: '최승범', role: 'AI Product Strategy', photo: '/team/seungbeom.jpg' },
+  { name: '김진선', role: 'Creative PM', photo: '/team/jinseun.jpg' },
 ]
 
 const ROADMAP: { status: 'done' | 'wip' | 'planned'; label: string; desc: string }[] = [
