@@ -4,6 +4,7 @@ import {
   HelpCircle, PartyPopper, Info, X, Star,
   MonitorPlay, LayoutGrid, Camera, Send, MessageSquare, ExternalLink, Play, Pause,
   ArrowLeft, ChevronLeft, ChevronRight as ChevronRightIcon,
+  Sparkles, Users, Lightbulb, Clock,
 } from 'lucide-react'
 import { useLiff } from '../contexts/LiffContext'
 import type { LocationData } from './VerifyPage'
@@ -14,7 +15,7 @@ interface Props {
   location: LocationData
 }
 
-type View = 'menu' | 'raffle' | 'slides' | 'wall'
+type View = 'menu' | 'raffle' | 'slides' | 'wall' | 'info'
 type SlideTab = 'live' | 'slides' | 'photos' | 'qa'
 
 export default function MainPage({ location }: Props) {
@@ -26,6 +27,7 @@ export default function MainPage({ location }: Props) {
   if (view === 'raffle') return <RafflePage location={location} onBack={() => setView('menu')} />
   if (view === 'slides') return <SlidesView onBack={() => setView('menu')} />
   if (view === 'wall') return <WallView profile={profile} onBack={() => setView('menu')} />
+  if (view === 'info') return <InfoView onBack={() => setView('menu')} />
 
   const soon = () => alert('준비 중이에요!')
 
@@ -76,7 +78,7 @@ export default function MainPage({ location }: Props) {
         <MenuItem icon={<HelpCircle size={18} style={{ color: '#34d399' }} />}          title="주최 측에 문의하기"  desc="운영진에게 바로 연락"              color="#34d399" onClick={soon} />
         <MenuItem icon={<Wifi size={18} style={{ color: '#94a3b8' }} />}                title="WiFi 비밀번호"       desc="탭하면 클립보드에 복사"            color="#94a3b8"
           onClick={() => { navigator.clipboard?.writeText('hackday!'); alert('복사됐어요: hackday!') }} />
-        <MenuItem icon={<Info size={18} style={{ color: '#64748b' }} />}                title="행사 기타 정보"      desc="장소, 주차, 공지"                  color="#64748b" onClick={soon} />
+        <MenuItem icon={<Info size={18} style={{ color: '#64748b' }} />}                title="행사 기타 정보"      desc="만든 사람들 · 로드맵"              color="#64748b" onClick={() => setView('info')} />
       </div>
 
       {/* Score Tip Modal */}
@@ -457,6 +459,139 @@ function MenuItem({ icon, title, desc, color, onClick }: {
       </div>
       <ChevronRight size={16} style={{ color: 'var(--text-muted)' }} />
     </button>
+  )
+}
+
+// ── 기타 정보 / About 페이지 ─────────────────────────────────────
+const TEAM = [
+  { name: '정덕범 (Tiger)', role: 'Product · Dev', photo: '/team/tiger.jpg' },
+  { name: '최승범', role: 'Design · UX', photo: '/team/seungbeom.jpg' },
+  { name: '김진선', role: 'Planning · PM', photo: '/team/jinseun.jpg' },
+]
+
+const ROADMAP: { status: 'done' | 'wip' | 'planned'; label: string; desc: string }[] = [
+  { status: 'done',    label: 'QR 체크인 + Presence Score',       desc: 'LINE LIFF 기반 위치 인증 시스템' },
+  { status: 'done',    label: '경품 추첨',                          desc: '기프티콘 모드, 실시간 당첨 알림' },
+  { status: 'done',    label: '메시지 월',                          desc: '실시간 라이브 스크린 메시지' },
+  { status: 'done',    label: '발표 슬라이드 뷰어',                  desc: '자동 슬라이드쇼 · 그리드 보기' },
+  { status: 'wip',     label: '전체 발송 (Blast Message)',          desc: '활성 유저 or LINE 전체 팔로워 대상' },
+  { status: 'planned', label: '타임 테이블',                        desc: '세션 일정 · 스피커 정보 연동' },
+  { status: 'planned', label: '실시간 Q&A',                        desc: '청중 질문 업보트 · 발표자 화면 연동' },
+  { status: 'planned', label: '이벤트 & 설문조사',                   desc: '포인트 적립 → 선물 교환' },
+  { status: 'planned', label: '실시간 자막 · 번역',                  desc: 'Live Caption · 외국어 발표 자막' },
+  { status: 'planned', label: '네트워킹 매칭',                      desc: '관심사 기반 참가자 연결' },
+  { status: 'planned', label: '행사 사진 갤러리',                    desc: '현장 사진 업로드 & 공유' },
+  { status: 'planned', label: '글로벌 다국어 지원',                  desc: 'EN · JA · KO 자동 전환' },
+]
+
+const STATUS_META = {
+  done:    { label: '완료',  color: '#4ade80', bg: 'rgba(74,222,128,0.1)',  border: '#166534' },
+  wip:     { label: '진행',  color: '#facc15', bg: 'rgba(250,204,21,0.1)', border: '#713f12' },
+  planned: { label: '예정',  color: '#818cf8', bg: 'rgba(129,140,248,0.08)', border: '#312e81' },
+}
+
+function InfoView({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="min-h-dvh flex flex-col" style={{ background: 'var(--bg)' }}>
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 pt-6 pb-4">
+        <button onClick={onBack} style={{ background: 'var(--bg-card)', border: 'none', borderRadius: 12, padding: '8px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          <ArrowLeft size={16} style={{ color: 'var(--text-muted)' }} />
+        </button>
+        <div>
+          <p className="font-bold text-base" style={{ color: 'var(--text)', margin: 0 }}>기타 정보</p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)', margin: 0 }}>만든 사람들 · 로드맵</p>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 40px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+        {/* imin 소개 */}
+        <div style={{ borderRadius: 20, padding: '24px 20px', background: 'var(--bg-card)', border: '1px solid var(--green-dim)', textAlign: 'center' }}>
+          <img src="/logo.png" alt="imin" style={{ height: 32, filter: 'brightness(0) invert(1)', margin: '0 auto 12px' }} />
+          <p style={{ fontSize: 13, color: '#a1a1aa', lineHeight: 1.7, margin: 0 }}>
+            <strong style={{ color: 'var(--green)' }}>I'm in</strong> — 지금 여기, 이 자리에 있는 사람만.<br />
+            행사 참여 경험을 더 풍부하게 만들기 위한<br />LINE LIFF 기반 이벤트 플랫폼입니다.
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14 }}>
+            <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: '#0d2818', color: 'var(--green)', border: '1px solid var(--green-dim)' }}>
+              LINE LIFF
+            </span>
+            <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: '#1e1b4b', color: '#818cf8', border: '1px solid #312e81' }}>
+              Hackday 2025
+            </span>
+            <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: '#27272a', color: '#71717a', border: '1px solid #3f3f46' }}>
+              Tech Week KR
+            </span>
+          </div>
+        </div>
+
+        {/* 만든 사람들 */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+            <Users size={14} style={{ color: 'var(--text-muted)' }} />
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>만든 사람들</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {TEAM.map((t, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 16, background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                <img
+                  src={t.photo}
+                  alt={t.name}
+                  style={{ width: 44, height: 44, borderRadius: 14, objectFit: 'cover', flexShrink: 0, background: '#27272a' }}
+                  onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden' }}
+                />
+                <div>
+                  <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{t.name}</p>
+                  <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>{t.role}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 로드맵 */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+            <Lightbulb size={14} style={{ color: 'var(--text-muted)' }} />
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>로드맵</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {ROADMAP.map((item, i) => {
+              const meta = STATUS_META[item.status]
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 16px', borderRadius: 16,
+                  background: item.status === 'done' ? 'rgba(74,222,128,0.04)' : 'var(--bg-card)',
+                  border: `1px solid ${item.status === 'done' ? '#1a3a26' : 'var(--border)'}` }}>
+                  <div style={{ marginTop: 2, flexShrink: 0 }}>
+                    {item.status === 'done'
+                      ? <CheckCircle size={15} style={{ color: '#4ade80' }} />
+                      : item.status === 'wip'
+                        ? <Clock size={15} style={{ color: '#facc15' }} />
+                        : <Sparkles size={15} style={{ color: '#818cf8' }} />}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: item.status === 'done' ? '#e4e4e7' : 'var(--text)' }}>{item.label}</p>
+                    <p style={{ margin: '3px 0 0', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>{item.desc}</p>
+                  </div>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 20, flexShrink: 0,
+                    background: meta.bg, color: meta.color, border: `1px solid ${meta.border}` }}>
+                    {meta.label}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* 버전 */}
+        <div style={{ textAlign: 'center', paddingBottom: 8 }}>
+          <p style={{ fontSize: 11, color: '#3f3f46', margin: 0 }}>imin v0.1 · Hackday 2025 · LINE Planet VoIP</p>
+          <p style={{ fontSize: 11, color: '#3f3f46', marginTop: 4 }}>Built with LINE LIFF · React · Vercel · Upstash Redis</p>
+        </div>
+
+      </div>
+    </div>
   )
 }
 
