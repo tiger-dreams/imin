@@ -27,6 +27,8 @@ interface RemoteRaffleState {
   status: RaffleStatus
   prize?: string
   prizeImageUrl?: string
+  prizeImages?: string[]   // 기프티콘 모드: 당첨자별 이미지 URL
+  giftMode?: boolean       // true → 당첨자별 개별 이미지
   count?: number
   method?: RaffleMethod
   chosung?: string
@@ -41,6 +43,8 @@ interface RemoteRaffleState {
 interface FormConfig {
   prize: string
   prizeImageUrl?: string
+  prizeImages: string[]    // 기프티콘 모드: 당첨자별 이미지 URL
+  giftMode: boolean        // true → 기프티콘 모드 (당첨자별 별도 이미지)
   count: number
   method: RaffleMethod
   chosung: string
@@ -51,6 +55,8 @@ interface FormConfig {
 interface HistoryEntry {
   prize: string
   prizeImageUrl?: string
+  prizeImages?: string[]
+  giftMode?: boolean
   count: number
   method: RaffleMethod
   winners: WinnerEntry[]
@@ -68,15 +74,17 @@ const METHOD_OPTIONS: { value: RaffleMethod; label: string; desc: string; icon: 
 ]
 
 const CONFIRM_WINDOW_MS = 15000
-const DEFAULT_FORM: FormConfig = { prize: '', prizeImageUrl: undefined, count: 1, method: 'random', chosung: '', allowedCities: [], demoMode: false }
+const DEFAULT_FORM: FormConfig = { prize: '', prizeImageUrl: undefined, prizeImages: [], giftMode: false, count: 1, method: 'random', chosung: '', allowedCities: [], demoMode: false }
 
 export default function AdminPage() {
   const [users, setUsers] = useState<ActiveUser[]>([])
   const [loading, setLoading] = useState(true)
   const [remote, setRemote] = useState<RemoteRaffleState>({ status: 'idle' })
   const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [uploadingImage, setUploadingImage] = useState(false)
+  const [giftPreviews, setGiftPreviews] = useState<(string | null)[]>([])
+  const [uploadingSlot, setUploadingSlot] = useState<number | null>(null)  // -1=단일, 0+=슬롯
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const uploadingSlotRef = useRef<number>(-1)
   const [form, setForm] = useState<FormConfig>(DEFAULT_FORM)
   const [isDrawing, setIsDrawing] = useState(false)
   const [now, setNow] = useState(Date.now())
@@ -140,11 +148,15 @@ export default function AdminPage() {
     const file = e.target.files?.[0]
     if (!file) return
     e.target.value = ''
-    setUploadingImage(true)
+    const slot = uploadingSlotRef.current
+    setUploadingSlot(slot)
     try {
-      // Canvas로 압축 (max 900px, JPEG 82%) — Upstash REST 1MB 제한 대응
       const compressed = await compressImage(file, 900, 0.82)
-      setImagePreview(compressed)
+      if (slot === -1) {
+        setImagePreview(compressed)
+      } else {
+        setGiftPreviews(prev => { const next = [...prev]; next[slot] = compressed; return next })
+      }
       const res = await fetch('/api/raffle-prize-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -152,23 +164,33 @@ export default function AdminPage() {
       })
       if (!res.ok) throw new Error((await res.json() as { error: string }).error)
       const json = await res.json() as { url: string }
-      setForm(f => ({ ...f, prizeImageUrl: json.url }))
+      if (slot === -1) {
+        setForm(f => ({ ...f, prizeImageUrl: json.url }))
+      } else {
+        setForm(f => { const imgs = [...f.prizeImages]; imgs[slot] = json.url; return { ...f, prizeImages: imgs } })
+      }
     } catch (err) {
       alert(`이미지 업로드 실패: ${err}`)
-      setImagePreview(null)
+      if (slot === -1) setImagePreview(null)
+      else setGiftPreviews(prev => { const next = [...prev]; next[slot] = null; return next })
     } finally {
-      setUploadingImage(false)
+      setUploadingSlot(null)
     }
   }
 
-  const removePrizeImage = () => {
-    setImagePreview(null)
-    setForm(f => ({ ...f, prizeImageUrl: undefined }))
+  const removePrizeImage = (slot?: number) => {
+    if (slot === undefined) {
+      setImagePreview(null)
+      setForm(f => ({ ...f, prizeImageUrl: undefined }))
+    } else {
+      setGiftPreviews(prev => { const next = [...prev]; next[slot] = null; return next })
+      setForm(f => { const imgs = [...f.prizeImages]; imgs[slot] = ''; return { ...f, prizeImages: imgs } })
+    }
   }
 
   const startRaffle = () => {
     const pool = eligiblePool(users)
-    pushRemote({ status: 'open', prize: form.prize, prizeImageUrl: form.prizeImageUrl, count: form.count, method: form.method, chosung: form.chosung, allowedCities: form.allowedCities, pool, winners: [], demoMode: form.demoMode })
+    pushRemote({ status: 'open', prize: form.prize, prizeImageUrl: form.prizeImageUrl, prizeImages: form.prizeImages, giftMode: form.giftMode, count: form.count, method: form.method, chosung: form.chosung, allowedCities: form.allowedCities, pool, winners: [], demoMode: form.demoMode })
   }
 
   const pickWinners = (pool: ActiveUser[], count: number, method: RaffleMethod): ActiveUser[] => {
@@ -180,7 +202,11 @@ export default function AdminPage() {
     return [...candidates].sort(() => Math.random() - 0.5).slice(0, count)
   }
 
-  const sendRaffleResults = async (winners: WinnerEntry[], pool: ActiveUser[], prize?: string, prizeImageUrl?: string) => {
+  const sendRaffleResults = async (
+    winners: WinnerEntry[], pool: ActiveUser[],
+    prize?: string, prizeImageUrl?: string,
+    giftMode?: boolean, prizeImages?: string[]
+  ) => {
     const poolIds = pool.map(u => u.userId).filter(Boolean)
 
     // 추첨 풀 전체에게 발송 (당첨자 포함)
@@ -193,14 +219,15 @@ export default function AdminPage() {
       }),
     })
 
-    // 당첨자에게 개별 수령 안내 발송
-    await Promise.all(winners.map(w =>
-      fetch('/api/raffle-notify', {
+    // 당첨자에게 개별 수령 안내 발송 (기프티콘 모드: 각자 다른 이미지)
+    await Promise.all(winners.map((w, i) => {
+      const imgUrl = giftMode ? (prizeImages?.[i] || undefined) : prizeImageUrl
+      return fetch('/api/raffle-notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: w.userId, prize, prizeImageUrl }),
+        body: JSON.stringify({ userId: w.userId, prize, prizeImageUrl: imgUrl }),
       })
-    ))
+    }))
   }
 
   const draw = async () => {
@@ -217,7 +244,7 @@ export default function AdminPage() {
 
       // demoMode: 추첨 직후 자동 발송
       if (isDemoMode) {
-        sendRaffleResults(winners, pool, remote.prize, remote.prizeImageUrl)
+        sendRaffleResults(winners, pool, remote.prize, remote.prizeImageUrl, remote.giftMode, remote.prizeImages)
       }
 
       setIsDrawing(false)
@@ -241,6 +268,7 @@ export default function AdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prize: remote.prize, prizeImageUrl: remote.prizeImageUrl,
+          prizeImages: remote.prizeImages, giftMode: remote.giftMode,
           count: remote.count, method: remote.method,
           winners: remote.winners, pool: remote.pool, allowedCities: remote.allowedCities,
         }),
@@ -295,6 +323,12 @@ export default function AdminPage() {
 
           {/* 좌: 활성 접속자 */}
           <div style={{ background: '#18181b', borderRadius: 16, padding: 20, border: '1px solid #27272a', minWidth: 0 }}>
+            {/* LINE QR 코드 */}
+            <div style={{ marginBottom: 16, borderRadius: 12, overflow: 'hidden', background: '#ffffff', padding: 10, textAlign: 'center' }}>
+              <img src="/line_qr.png" alt="LINE QR" style={{ width: '100%', maxWidth: 240, display: 'block', margin: '0 auto', borderRadius: 4 }} />
+              <p style={{ fontSize: 11, marginTop: 6, marginBottom: 0, textAlign: 'center', background: '#ffffff', color: '#3f3f46' }}>LINE으로 참여하기</p>
+            </div>
+
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Users size={15} style={{ color: '#4ade80' }} />
@@ -338,37 +372,115 @@ export default function AdminPage() {
                     <p style={{ fontSize: 11, color: '#facc15', marginTop: 6 }}>50,000원 이상 — 당첨자 제세공과금 정보 수집 필요</p>
                   )}
 
-                  {/* 상품 이미지 */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
-                    <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={handlePrizeImage} />
-                    <button type="button" onClick={() => imageInputRef.current?.click()}
-                      disabled={uploadingImage}
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8,
-                        background: '#27272a', border: '1px solid #3f3f46', color: uploadingImage ? '#52525b' : '#a1a1aa',
-                        cursor: uploadingImage ? 'wait' : 'pointer', fontSize: 12 }}>
-                      {uploadingImage
-                        ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
-                        : <ImagePlus size={13} />}
-                      {uploadingImage ? '업로드 중...' : imagePreview ? '이미지 변경' : '이미지 추가'}
-                    </button>
-                    {imagePreview && !uploadingImage && (
-                      <>
-                        <img src={imagePreview} alt="prize"
-                          style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 8, border: '1px solid #3f3f46' }} />
-                        <button type="button" onClick={removePrizeImage}
-                          style={{ display: 'flex', alignItems: 'center', padding: 4, borderRadius: 6,
-                            background: 'none', border: 'none', color: '#52525b', cursor: 'pointer' }}>
-                          <X size={13} />
-                        </button>
-                      </>
-                    )}
+                  {/* 이미지 모드 토글 */}
+                  <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                    {[false, true].map(gm => (
+                      <button key={String(gm)} type="button"
+                        onClick={() => {
+                          setForm(f => ({ ...f, giftMode: gm, prizeImages: gm ? Array(f.count).fill('') : [] }))
+                          setGiftPreviews(gm ? Array(form.count).fill(null) : [])
+                          if (!gm) { setImagePreview(null) }
+                        }}
+                        style={{ flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                          border: form.giftMode === gm ? '1px solid #fb923c' : '1px solid #3f3f46',
+                          background: form.giftMode === gm ? 'rgba(251,146,60,0.08)' : '#27272a',
+                          color: form.giftMode === gm ? '#fb923c' : '#71717a' }}>
+                        {gm ? '🎫 기프티콘 모드' : '단일 이미지'}
+                      </button>
+                    ))}
                   </div>
+
+                  {/* 공유 파일 input */}
+                  <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={handlePrizeImage} />
+
+                  {/* 단일 이미지 업로드 */}
+                  {!form.giftMode && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                      <button type="button"
+                        onClick={() => { uploadingSlotRef.current = -1; imageInputRef.current?.click() }}
+                        disabled={uploadingSlot !== null}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8,
+                          background: '#27272a', border: '1px solid #3f3f46', color: uploadingSlot === -1 ? '#52525b' : '#a1a1aa',
+                          cursor: uploadingSlot !== null ? 'wait' : 'pointer', fontSize: 12 }}>
+                        {uploadingSlot === -1
+                          ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                          : <ImagePlus size={13} />}
+                        {uploadingSlot === -1 ? '업로드 중...' : imagePreview ? '이미지 변경' : '이미지 추가'}
+                      </button>
+                      {imagePreview && uploadingSlot !== -1 && (
+                        <>
+                          <img src={imagePreview} alt="prize"
+                            style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 8, border: '1px solid #3f3f46' }} />
+                          <button type="button" onClick={() => removePrizeImage()}
+                            style={{ display: 'flex', alignItems: 'center', padding: 4, borderRadius: 6,
+                              background: 'none', border: 'none', color: '#52525b', cursor: 'pointer' }}>
+                            <X size={13} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 기프티콘 모드: 당첨자별 이미지 슬롯 */}
+                  {form.giftMode && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                      {Array.from({ length: form.count }, (_, i) => {
+                        const preview = giftPreviews[i] ?? null
+                        const isUploading = uploadingSlot === i
+                        const hasImg = !!form.prizeImages[i]
+                        return (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 12, color: '#a1a1aa', minWidth: 60, flexShrink: 0 }}>{i + 1}번 당첨자</span>
+                            <button type="button"
+                              onClick={() => { uploadingSlotRef.current = i; imageInputRef.current?.click() }}
+                              disabled={uploadingSlot !== null}
+                              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 8,
+                                background: '#27272a', border: hasImg ? '1px solid #fb923c' : '1px solid #3f3f46',
+                                color: isUploading ? '#52525b' : hasImg ? '#fb923c' : '#a1a1aa',
+                                cursor: uploadingSlot !== null ? 'wait' : 'pointer', fontSize: 12 }}>
+                              {isUploading
+                                ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                                : <ImagePlus size={12} />}
+                              {isUploading ? '업로드 중...' : hasImg ? '변경' : '이미지 추가'}
+                            </button>
+                            {preview && !isUploading && (
+                              <>
+                                <img src={preview} alt={`prize-${i}`}
+                                  style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 6, border: '1px solid #fb923c' }} />
+                                <button type="button" onClick={() => removePrizeImage(i)}
+                                  style={{ display: 'flex', alignItems: 'center', padding: 4, borderRadius: 6,
+                                    background: 'none', border: 'none', color: '#52525b', cursor: 'pointer' }}>
+                                  <X size={12} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )
+                      })}
+                      {form.prizeImages.filter(Boolean).length < form.count && (
+                        <p style={{ fontSize: 11, color: '#fb923c', marginTop: 2 }}>
+                          {form.count - form.prizeImages.filter(Boolean).length}장 더 업로드 필요
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </Field>
 
                 <Field label="당첨 인원">
                   <div style={{ display: 'flex', gap: 8 }}>
                     {[1, 2, 3, 5].map(n => (
-                      <button key={n} onClick={() => setForm(f => ({ ...f, count: n }))}
+                      <button key={n} onClick={() => {
+                        setForm(f => ({
+                          ...f, count: n,
+                          prizeImages: f.giftMode
+                            ? [...f.prizeImages.slice(0, n), ...Array(Math.max(0, n - f.prizeImages.length)).fill('')]
+                            : f.prizeImages,
+                        }))
+                        setGiftPreviews(prev => [
+                          ...prev.slice(0, n),
+                          ...Array(Math.max(0, n - prev.length)).fill(null),
+                        ])
+                      }}
                         style={{ flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer', border: 'none',
                           background: form.count === n ? '#4ade80' : '#27272a', color: form.count === n ? '#09090b' : '#a1a1aa' }}>
                         {n}명
@@ -520,14 +632,17 @@ function HistoryCard({ entry }: { entry: HistoryEntry }) {
   const date = new Date(entry.savedAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   const confirmed = entry.winners.filter(w => w.confirmed).length
 
-  const sendMsg = async (userId: string) => {
+  const sendMsg = async (userId: string, winnerIdx: number) => {
     if (sending) return
     setSending(userId)
     try {
+      const imgUrl = entry.giftMode
+        ? (entry.prizeImages?.[winnerIdx] || undefined)
+        : entry.prizeImageUrl
       await fetch('/api/raffle-notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, prize: entry.prize, prizeImageUrl: entry.prizeImageUrl }),
+        body: JSON.stringify({ userId, prize: entry.prize, prizeImageUrl: imgUrl }),
       })
     } finally {
       setSending(null)
@@ -549,23 +664,27 @@ function HistoryCard({ entry }: { entry: HistoryEntry }) {
       </button>
       {open && (
         <div style={{ borderTop: '1px solid #3f3f46', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {entry.winners.map((w, i) => (
-            <div key={w.userId} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-              <span style={{ color: '#facc15', width: 16 }}>{i + 1}</span>
-              <span style={{ flex: 1, color: '#e4e4e7' }}>{w.displayName}</span>
-              <span style={{ color: '#71717a' }}>{countryFlag(w.countryCode)} {w.city}</span>
-              {w.confirmed
-                ? <CheckCircle size={12} style={{ color: '#4ade80' }} />
-                : <XCircle size={12} style={{ color: '#f87171' }} />}
-              <button
-                onClick={() => sendMsg(w.userId)}
-                disabled={sending === w.userId}
-                title="LINE 메시지 발송"
-                style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', border: '1px solid #3f3f46', background: '#18181b', color: sending === w.userId ? '#52525b' : '#a1a1aa' }}>
-                <Send size={10} /> {sending === w.userId ? '발송 중' : '발송'}
-              </button>
-            </div>
-          ))}
+          {entry.winners.map((w, i) => {
+            const slotImg = entry.giftMode ? (entry.prizeImages?.[i] || null) : (entry.prizeImageUrl || null)
+            return (
+              <div key={w.userId} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                <span style={{ color: '#facc15', width: 16 }}>{i + 1}</span>
+                {slotImg && <img src={slotImg} alt="" style={{ width: 24, height: 24, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }} />}
+                <span style={{ flex: 1, color: '#e4e4e7' }}>{w.displayName}</span>
+                <span style={{ color: '#71717a' }}>{countryFlag(w.countryCode)} {w.city}</span>
+                {w.confirmed
+                  ? <CheckCircle size={12} style={{ color: '#4ade80' }} />
+                  : <XCircle size={12} style={{ color: '#f87171' }} />}
+                <button
+                  onClick={() => sendMsg(w.userId, i)}
+                  disabled={sending === w.userId}
+                  title="LINE 메시지 발송"
+                  style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer', border: '1px solid #3f3f46', background: '#18181b', color: sending === w.userId ? '#52525b' : '#a1a1aa' }}>
+                  <Send size={10} /> {sending === w.userId ? '발송 중' : '발송'}
+                </button>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
