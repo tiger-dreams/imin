@@ -34,6 +34,7 @@ interface RemoteRaffleState {
   pool?: ActiveUser[]
   allowedCities?: string[]
   confirmDeadline?: number
+  demoMode?: boolean  // true → 15초 확인창 없음 + 추첨 직후 자동 발송
 }
 
 // 로컬 폼 설정 (서버 동기화와 무관)
@@ -44,7 +45,7 @@ interface FormConfig {
   method: RaffleMethod
   chosung: string
   allowedCities: string[]
-  requireImin: boolean  // false → imin 체크인 없이도 풀에 포함
+  demoMode: boolean  // 이번 데모 한정: 확인창 제거 + 추첨 직후 전체 발송
 }
 
 interface HistoryEntry {
@@ -67,7 +68,7 @@ const METHOD_OPTIONS: { value: RaffleMethod; label: string; desc: string; icon: 
 ]
 
 const CONFIRM_WINDOW_MS = 15000
-const DEFAULT_FORM: FormConfig = { prize: '', prizeImageUrl: undefined, count: 1, method: 'random', chosung: '', allowedCities: [], requireImin: true }
+const DEFAULT_FORM: FormConfig = { prize: '', prizeImageUrl: undefined, count: 1, method: 'random', chosung: '', allowedCities: [], demoMode: false }
 
 export default function AdminPage() {
   const [users, setUsers] = useState<ActiveUser[]>([])
@@ -166,12 +167,8 @@ export default function AdminPage() {
   }
 
   const startRaffle = () => {
-    // requireImin=false 시 active users 전체 포함 (imin 미체크인도 허용)
-    const base = form.requireImin
-      ? users
-      : users  // 현재는 active users = imin users; 향후 LINE followers 확장 가능
-    const pool = eligiblePool(base)
-    pushRemote({ status: 'open', prize: form.prize, prizeImageUrl: form.prizeImageUrl, count: form.count, method: form.method, chosung: form.chosung, allowedCities: form.allowedCities, pool, winners: [] })
+    const pool = eligiblePool(users)
+    pushRemote({ status: 'open', prize: form.prize, prizeImageUrl: form.prizeImageUrl, count: form.count, method: form.method, chosung: form.chosung, allowedCities: form.allowedCities, pool, winners: [], demoMode: form.demoMode })
   }
 
   const pickWinners = (pool: ActiveUser[], count: number, method: RaffleMethod): ActiveUser[] => {
@@ -183,14 +180,47 @@ export default function AdminPage() {
     return [...candidates].sort(() => Math.random() - 0.5).slice(0, count)
   }
 
+  const sendRaffleResults = async (winners: WinnerEntry[], pool: ActiveUser[], prize?: string, prizeImageUrl?: string) => {
+    const winnerNames = winners.map(w => w.displayName).join(', ')
+    const poolIds = pool.map(u => u.userId).filter(Boolean)
+
+    // 추첨 풀 전체에게 결과 알림 (당첨자 포함)
+    await fetch('/api/blast-message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userIds: poolIds,
+        text: `🎉 추첨 결과 발표!\n당첨자: ${winnerNames}${prize ? `\n상품: ${prize}` : ''}\n\nimin과 함께해주셔서 감사합니다!`,
+      }),
+    })
+
+    // 당첨자에게 개별 수령 안내 발송
+    await Promise.all(winners.map(w =>
+      fetch('/api/raffle-notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: w.userId, prize, prizeImageUrl }),
+      })
+    ))
+  }
+
   const draw = async () => {
     if (isDrawing) return
     setIsDrawing(true)
     await pushRemote({ ...remote, status: 'drawing' })
     setTimeout(async () => {
       const pool = remote.pool ?? users
-      const winners: WinnerEntry[] = pickWinners(pool, remote.count ?? 1, remote.method ?? 'random').map(w => ({ ...w, confirmed: false }))
-      await pushRemote({ ...remote, status: 'result', winners, pool, confirmDeadline: Date.now() + CONFIRM_WINDOW_MS })
+      const isDemoMode = remote.demoMode ?? false
+      // demoMode: 즉시 confirmed, confirmDeadline 없음
+      const winners: WinnerEntry[] = pickWinners(pool, remote.count ?? 1, remote.method ?? 'random')
+        .map(w => ({ ...w, confirmed: isDemoMode }))
+      await pushRemote({ ...remote, status: 'result', winners, pool, confirmDeadline: isDemoMode ? 0 : Date.now() + CONFIRM_WINDOW_MS })
+
+      // demoMode: 추첨 직후 자동 발송
+      if (isDemoMode) {
+        sendRaffleResults(winners, pool, remote.prize, remote.prizeImageUrl)
+      }
+
       setIsDrawing(false)
     }, 2500)
   }
@@ -348,21 +378,21 @@ export default function AdminPage() {
                   </div>
                 </Field>
 
-                <Field label="참여 조건">
+                <Field label="데모 설정">
                   <div style={{ display: 'flex', gap: 8 }}>
-                    {[true, false].map(req => (
-                      <button key={String(req)} onClick={() => setForm(f => ({ ...f, requireImin: req }))}
+                    {[false, true].map(demo => (
+                      <button key={String(demo)} onClick={() => setForm(f => ({ ...f, demoMode: demo }))}
                         style={{ flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                          border: form.requireImin === req ? '1px solid #4ade80' : '1px solid #3f3f46',
-                          background: form.requireImin === req ? 'rgba(74,222,128,0.08)' : '#27272a',
-                          color: form.requireImin === req ? '#4ade80' : '#a1a1aa' }}>
-                        {req ? 'imin 체크인 필수' : 'imin 없이 참여'}
+                          border: form.demoMode === demo ? '1px solid #818cf8' : '1px solid #3f3f46',
+                          background: form.demoMode === demo ? 'rgba(129,140,248,0.08)' : '#27272a',
+                          color: form.demoMode === demo ? '#818cf8' : '#a1a1aa' }}>
+                        {demo ? '데모 모드' : '일반'}
                       </button>
                     ))}
                   </div>
-                  {!form.requireImin && (
+                  {form.demoMode && (
                     <p style={{ fontSize: 11, color: '#818cf8', marginTop: 6 }}>
-                      imin 없이 참여 — 전체 발송으로 알린 후 현장에서 참여 가능
+                      15초 확인창 없음 · 추첨 직후 pool 전체에 결과 발송
                     </p>
                   )}
                 </Field>
@@ -549,21 +579,23 @@ function ResultPanel({ raffle, now, onReroll, onReset }: {
   const deadline = raffle.confirmDeadline ?? 0
   const remaining = Math.max(0, Math.ceil((deadline - now) / 1000))
   const expired = now > deadline
+  const demo = raffle.demoMode ?? false
 
   return (
     <div style={{ background: '#18181b', borderRadius: 16, padding: 24, border: '1px solid #713f12' }}>
       <h2 style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 18, fontWeight: 700, margin: '0 0 6px', color: '#facc15' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Trophy size={18} /> 당첨자 {raffle.winners!.length}명</span>
-        {!expired && <span style={{ fontSize: 14, color: remaining <= 5 ? '#f87171' : '#a1a1aa', fontVariantNumeric: 'tabular-nums' }}>확인 {remaining}s</span>}
+        {/* 데모 모드: 확인 타이머 없음 */}
+        {!demo && !expired && <span style={{ fontSize: 14, color: remaining <= 5 ? '#f87171' : '#a1a1aa', fontVariantNumeric: 'tabular-nums' }}>확인 {remaining}s</span>}
+        {demo && <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 20, background: '#1e1b4b', color: '#818cf8', border: '1px solid #312e81' }}>데모 · 자동발송 완료</span>}
       </h2>
       {raffle.prize && <p style={{ textAlign: 'center', fontSize: 13, color: '#facc15', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Gift size={13} />{raffle.prize}</p>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
         {raffle.winners!.map((w, i) => {
-          const canReroll = expired && !w.confirmed
+          const canReroll = !demo && expired && !w.confirmed
           return (
             <div key={w.userId} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 12,
-              background: w.confirmed ? 'rgba(74,222,128,0.08)' : 'rgba(250,204,21,0.08)',
-              border: `1px solid ${w.confirmed ? '#166534' : '#713f12'}` }}>
+              background: 'rgba(74,222,128,0.08)', border: '1px solid #166534' }}>
               <span style={{ fontSize: 22, fontWeight: 700, color: '#facc15', width: 28 }}>{i + 1}</span>
               <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#3f3f46', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#facc15', fontSize: 16 }}>{w.displayName[0]}</div>
               <div style={{ flex: 1 }}>
@@ -571,7 +603,8 @@ function ResultPanel({ raffle, now, onReroll, onReset }: {
                 <p style={{ margin: 0, fontSize: 12, color: '#71717a' }}>{countryFlag(w.countryCode)} {w.city}</p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {w.confirmed
+                {/* 데모 모드: 즉시 확인 완료 표시 */}
+                {(demo || w.confirmed)
                   ? <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#4ade80', fontWeight: 600 }}><CheckCircle size={14} />확인 완료</span>
                   : expired
                     ? <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#f87171' }}><XCircle size={14} />미응답</span>

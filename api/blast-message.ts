@@ -58,16 +58,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).end()
   if (!LINE_TOKEN) return res.status(500).json({ error: 'LINE token not configured' })
 
-  const { text, linkUrl, broadcast } = req.body as {
+  const { text, linkUrl, broadcast, userIds: targetIds } = req.body as {
     text: string
     linkUrl?: string
-    broadcast?: boolean  // true → LINE broadcast to all followers; false → multicast to active users
+    broadcast?: boolean   // true → LINE broadcast (전체 팔로워)
+    userIds?: string[]    // 지정 시 해당 목록에만 multicast
   }
   if (!text?.trim()) return res.status(400).json({ error: 'text required' })
 
   const messages = makeMessage(text.trim(), linkUrl)
 
-  // broadcast mode: LINE이 팔로우한 전체에게 발송
+  // broadcast mode
   if (broadcast) {
     const lineRes = await fetch('https://api.line.me/v2/bot/message/broadcast', {
       method: 'POST',
@@ -79,18 +80,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ ok: true, sent: 'all' })
   }
 
-  // multicast mode: active imin 유저에게만 발송
+  // 지정 userIds multicast (추첨 후 pool 전체 발송에 사용)
+  if (targetIds && targetIds.length > 0) {
+    const to = [...new Set(targetIds)].slice(0, 500)
+    const lineRes = await fetch('https://api.line.me/v2/bot/message/multicast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${LINE_TOKEN}` },
+      body: JSON.stringify({ to, messages }),
+    })
+    const json = await lineRes.json()
+    if (!lineRes.ok) return res.status(500).json({ error: json })
+    return res.status(200).json({ ok: true, sent: to.length })
+  }
+
+  // active imin 유저에게만 발송 (기본)
   if (!REDIS_URL) return res.status(500).json({ error: 'Redis not configured' })
   const members = await redisCmd(['SMEMBERS', 'imin:active']) as string[] | null
   if (!members || members.length === 0) return res.status(200).json({ ok: true, sent: 0 })
 
-  // 유효한 유저만 추출
   const results = await redisPipeline(members.map(id => ['GET', `imin:user:${id}`]))
   const userIds = members.filter((_, i) => !!results[i])
-
   if (userIds.length === 0) return res.status(200).json({ ok: true, sent: 0 })
 
-  // LINE multicast: 최대 500명 (데모 범위)
   const lineRes = await fetch('https://api.line.me/v2/bot/message/multicast', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${LINE_TOKEN}` },
