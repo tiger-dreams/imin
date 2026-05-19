@@ -83,6 +83,8 @@ export default function AdminPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [giftPreviews, setGiftPreviews] = useState<(string | null)[]>([])
   const [uploadingSlot, setUploadingSlot] = useState<number | null>(null)  // -1=단일, 0+=슬롯
+  const [imageFileName, setImageFileName] = useState<string | null>(null)
+  const [giftFileNames, setGiftFileNames] = useState<(string | null)[]>([])
   const imageInputRef = useRef<HTMLInputElement>(null)
   const uploadingSlotRef = useRef<number>(-1)
   const [form, setForm] = useState<FormConfig>(DEFAULT_FORM)
@@ -149,13 +151,16 @@ export default function AdminPage() {
     if (!file) return
     e.target.value = ''
     const slot = uploadingSlotRef.current
+    const fileName = file.name
     setUploadingSlot(slot)
     try {
       const compressed = await compressImage(file, 900, 0.82)
       if (slot === -1) {
         setImagePreview(compressed)
+        setImageFileName(fileName)
       } else {
         setGiftPreviews(prev => { const next = [...prev]; next[slot] = compressed; return next })
+        setGiftFileNames(prev => { const next = [...prev]; next[slot] = fileName; return next })
       }
       const res = await fetch('/api/raffle-prize-image', {
         method: 'POST',
@@ -171,8 +176,11 @@ export default function AdminPage() {
       }
     } catch (err) {
       alert(`이미지 업로드 실패: ${err}`)
-      if (slot === -1) setImagePreview(null)
-      else setGiftPreviews(prev => { const next = [...prev]; next[slot] = null; return next })
+      if (slot === -1) { setImagePreview(null); setImageFileName(null) }
+      else {
+        setGiftPreviews(prev => { const next = [...prev]; next[slot] = null; return next })
+        setGiftFileNames(prev => { const next = [...prev]; next[slot] = null; return next })
+      }
     } finally {
       setUploadingSlot(null)
     }
@@ -181,9 +189,11 @@ export default function AdminPage() {
   const removePrizeImage = (slot?: number) => {
     if (slot === undefined) {
       setImagePreview(null)
+      setImageFileName(null)
       setForm(f => ({ ...f, prizeImageUrl: undefined }))
     } else {
       setGiftPreviews(prev => { const next = [...prev]; next[slot] = null; return next })
+      setGiftFileNames(prev => { const next = [...prev]; next[slot] = null; return next })
       setForm(f => { const imgs = [...f.prizeImages]; imgs[slot] = ''; return { ...f, prizeImages: imgs } })
     }
   }
@@ -410,10 +420,15 @@ export default function AdminPage() {
                       {imagePreview && uploadingSlot !== -1 && (
                         <>
                           <img src={imagePreview} alt="prize"
-                            style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 8, border: '1px solid #3f3f46' }} />
+                            style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 8, border: '1px solid #3f3f46', flexShrink: 0 }} />
+                          {imageFileName && (
+                            <span style={{ fontSize: 11, color: '#a1a1aa', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={imageFileName}>
+                              {imageFileName}
+                            </span>
+                          )}
                           <button type="button" onClick={() => removePrizeImage()}
                             style={{ display: 'flex', alignItems: 'center', padding: 4, borderRadius: 6,
-                              background: 'none', border: 'none', color: '#52525b', cursor: 'pointer' }}>
+                              background: 'none', border: 'none', color: '#52525b', cursor: 'pointer', marginLeft: 'auto' }}>
                             <X size={13} />
                           </button>
                         </>
@@ -446,10 +461,15 @@ export default function AdminPage() {
                             {preview && !isUploading && (
                               <>
                                 <img src={preview} alt={`prize-${i}`}
-                                  style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 6, border: '1px solid #fb923c' }} />
+                                  style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 6, border: '1px solid #fb923c', flexShrink: 0 }} />
+                                {giftFileNames[i] && (
+                                  <span style={{ fontSize: 11, color: '#a1a1aa', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={giftFileNames[i]!}>
+                                    {giftFileNames[i]}
+                                  </span>
+                                )}
                                 <button type="button" onClick={() => removePrizeImage(i)}
                                   style={{ display: 'flex', alignItems: 'center', padding: 4, borderRadius: 6,
-                                    background: 'none', border: 'none', color: '#52525b', cursor: 'pointer' }}>
+                                    background: 'none', border: 'none', color: '#52525b', cursor: 'pointer', marginLeft: 'auto', flexShrink: 0 }}>
                                   <X size={12} />
                                 </button>
                               </>
