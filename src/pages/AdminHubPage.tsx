@@ -7,9 +7,16 @@ export default function AdminHubPage() {
 
       <div style={{ width: '100%', maxWidth: 560 }}>
         {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: 48 }}>
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <img src="/logo.png" alt="imin" style={{ height: 36, filter: 'brightness(0) invert(1)', margin: '0 auto' }} />
           <p style={{ fontSize: 13, color: '#52525b', marginTop: 10 }}>Admin</p>
+        </div>
+
+        {/* QR Code */}
+        <div style={{ background: '#ffffff', borderRadius: 20, padding: '20px 20px 14px', marginBottom: 28, textAlign: 'center', maxWidth: 280, margin: '0 auto 28px' }}>
+          <img src="/line_qr.png" alt="LINE QR" style={{ width: '100%', display: 'block', borderRadius: 8 }} />
+          <p style={{ fontSize: 13, color: '#3f3f46', fontWeight: 600, marginTop: 10, marginBottom: 0 }}>LINE으로 참여하기</p>
+          <p style={{ fontSize: 11, color: '#71717a', marginTop: 4, marginBottom: 0 }}>QR을 스캔하면 바로 입장</p>
         </div>
 
         {/* Nav cards */}
