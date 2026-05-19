@@ -78,7 +78,7 @@ export default function MainPage({ location }: Props) {
         <MenuItem icon={<HelpCircle size={18} style={{ color: '#34d399' }} />}          title="주최 측에 문의하기"  desc="운영진에게 바로 연락"              color="#34d399" onClick={soon} />
         <MenuItem icon={<Wifi size={18} style={{ color: '#94a3b8' }} />}                title="WiFi 비밀번호"       desc="탭하면 클립보드에 복사"            color="#94a3b8"
           onClick={() => { navigator.clipboard?.writeText('hackday!'); alert('복사됐어요: hackday!') }} />
-        <MenuItem icon={<Info size={18} style={{ color: '#64748b' }} />}                title="행사 기타 정보"      desc="만든 사람들 · 로드맵"              color="#64748b" onClick={() => setView('info')} />
+        <MenuItem icon={<Info size={18} style={{ color: '#64748b' }} />}                title="About imin"           desc="만든 사람들 · 로드맵"              color="#64748b" onClick={() => setView('info')} />
       </div>
 
       {/* Score Tip Modal */}
@@ -499,7 +499,7 @@ function InfoView({ onBack }: { onBack: () => void }) {
           <ArrowLeft size={16} style={{ color: 'var(--text-muted)' }} />
         </button>
         <div>
-          <p className="font-bold text-base" style={{ color: 'var(--text)', margin: 0 }}>기타 정보</p>
+          <p className="font-bold text-base" style={{ color: 'var(--text)', margin: 0 }}>About imin</p>
           <p className="text-xs" style={{ color: 'var(--text-muted)', margin: 0 }}>만든 사람들 · 로드맵</p>
         </div>
       </div>
