@@ -219,10 +219,10 @@ export default function AdminPage() {
           </div>
         )}
 
-        <div className="admin-grid">
+        <div data-grid style={{ display: 'grid', gridTemplateColumns: '320px minmax(0, 1fr)', gap: 20, alignItems: 'start' }}>
 
           {/* 좌: 활성 접속자 */}
-          <div style={{ background: '#18181b', borderRadius: 16, padding: 20, border: '1px solid #27272a' }}>
+          <div style={{ background: '#18181b', borderRadius: 16, padding: 20, border: '1px solid #27272a', minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Users size={15} style={{ color: '#4ade80' }} />
@@ -248,7 +248,7 @@ export default function AdminPage() {
           </div>
 
           {/* 우: 추첨 패널 */}
-          <div>
+          <div style={{ minWidth: 0 }}>
             {remote.status === 'idle' && (
               <div style={{ background: '#18181b', borderRadius: 16, padding: 24, border: '1px solid #27272a' }}>
                 <h2 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 600, marginTop: 0, marginBottom: 20 }}>
@@ -381,17 +381,11 @@ export default function AdminPage() {
       </div>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
-        .admin-grid {
-          display: grid;
-          grid-template-columns: 320px 1fr;
-          gap: 20px;
-          align-items: start;
-        }
         .user-list { max-height: 520px; }
         @media (max-width: 768px) {
           .admin-root { font-size: 14px; }
           .admin-root > div { padding: 16px !important; }
-          .admin-grid { grid-template-columns: 1fr; }
+          .admin-root [data-grid] { grid-template-columns: 1fr !important; }
           .user-list { max-height: 260px; }
         }
       `}</style>
