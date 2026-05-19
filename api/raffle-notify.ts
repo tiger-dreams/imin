@@ -57,6 +57,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ],
           },
         ] : []),
+        { type: 'separator', margin: 'xl', color: '#27272a' },
+        {
+          type: 'text',
+          text: '☕ 커피 맛있게 드시고, imin team의 Hackday를 응원해주세요! 여러분의 투표가 큰 힘이 됩니다 💚',
+          size: 'xs', color: '#52525b', margin: 'lg', wrap: true,
+        },
       ],
       backgroundColor: '#18181b',
       paddingAll: '18px',

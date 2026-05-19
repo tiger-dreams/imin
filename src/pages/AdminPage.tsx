@@ -181,16 +181,15 @@ export default function AdminPage() {
   }
 
   const sendRaffleResults = async (winners: WinnerEntry[], pool: ActiveUser[], prize?: string, prizeImageUrl?: string) => {
-    const winnerNames = winners.map(w => w.displayName).join(', ')
     const poolIds = pool.map(u => u.userId).filter(Boolean)
 
-    // 추첨 풀 전체에게 결과 알림 (당첨자 포함)
+    // 추첨 풀 전체에게 발송 (당첨자 포함)
     await fetch('/api/blast-message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         userIds: poolIds,
-        text: `🎉 추첨 결과 발표!\n당첨자: ${winnerNames}${prize ? `\n상품: ${prize}` : ''}\n\nimin과 함께해주셔서 감사합니다!`,
+        text: `오늘 추첨에 참여해주셔서 감사합니다! 🙏\n\nimin team이 Hackday에서 더 멋진 서비스를 만들 수 있도록 응원과 투표 부탁드립니다 💚\n\n여러분의 한 표가 큰 힘이 됩니다!`,
       }),
     })
 
