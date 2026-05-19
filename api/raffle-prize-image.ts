@@ -28,13 +28,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const raw = await cmd(['GET', `imin:prize:image:${id}`]) as string | null
     if (!raw) return res.status(404).end()
 
-    const { data, type } = JSON.parse(raw) as { data: string; type: string }
-    // data is a data URL like "data:image/png;base64,..."
-    const base64 = data.split(',')[1]
+    const { data } = JSON.parse(raw) as { data: string; type: string }
+    // data URL: "data:image/jpeg;base64,/9j/..."
+    const commaIdx = data.indexOf(',')
+    if (commaIdx === -1) return res.status(500).end()
+    const base64 = data.slice(commaIdx + 1)
     const buf = Buffer.from(base64, 'base64')
-    res.setHeader('Content-Type', type)
-    res.setHeader('Cache-Control', 'public, max-age=604800')
-    return res.status(200).send(buf)
+
+    // Always JPEG after client-side compression
+    res.writeHead(200, {
+      'Content-Type': 'image/jpeg',
+      'Content-Length': buf.length,
+      'Cache-Control': 'public, max-age=604800',
+      'Access-Control-Allow-Origin': '*',
+    })
+    res.end(buf)
+    return
   }
 
   // POST /api/raffle-prize-image — upload image, return public URL
@@ -53,7 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await cmd(['SET', `imin:prize:image:${id}`, JSON.stringify({ data, type }), 'EX', TTL])
 
     const host = (req.headers['x-forwarded-host'] || req.headers.host) as string
-    const proto = (req.headers['x-forwarded-proto'] as string) || 'https'
+    const proto = ((req.headers['x-forwarded-proto'] as string) || 'https').split(',')[0].trim()
     const url = `${proto}://${host}/api/raffle-prize-image?id=${id}`
 
     return res.status(200).json({ ok: true, url, id })

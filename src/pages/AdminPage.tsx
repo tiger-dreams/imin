@@ -137,25 +137,26 @@ export default function AdminPage() {
   const handlePrizeImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = async (ev) => {
-      const dataUrl = ev.target?.result as string
-      setImagePreview(dataUrl)
-      setUploadingImage(true)
-      try {
-        const res = await fetch('/api/raffle-prize-image', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data: dataUrl, type: file.type }),
-        })
-        const json = await res.json() as { url: string }
-        setForm(f => ({ ...f, prizeImageUrl: json.url }))
-      } finally {
-        setUploadingImage(false)
-      }
-    }
-    reader.readAsDataURL(file)
     e.target.value = ''
+    setUploadingImage(true)
+    try {
+      // Canvas로 압축 (max 900px, JPEG 82%) — Upstash REST 1MB 제한 대응
+      const compressed = await compressImage(file, 900, 0.82)
+      setImagePreview(compressed)
+      const res = await fetch('/api/raffle-prize-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: compressed, type: 'image/jpeg' }),
+      })
+      if (!res.ok) throw new Error((await res.json() as { error: string }).error)
+      const json = await res.json() as { url: string }
+      setForm(f => ({ ...f, prizeImageUrl: json.url }))
+    } catch (err) {
+      alert(`이미지 업로드 실패: ${err}`)
+      setImagePreview(null)
+    } finally {
+      setUploadingImage(false)
+    }
   }
 
   const removePrizeImage = () => {
@@ -579,6 +580,29 @@ function Field({ label, children }: { label: string | React.ReactNode; children:
       {children}
     </div>
   )
+}
+
+function compressImage(file: File, maxPx: number, quality: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = reject
+    reader.onload = ev => {
+      const img = new Image()
+      img.onerror = reject
+      img.onload = () => {
+        const scale = Math.min(1, maxPx / img.width, maxPx / img.height)
+        const w = Math.round(img.width * scale)
+        const h = Math.round(img.height * scale)
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        canvas.getContext('2d')!.drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.src = ev.target?.result as string
+    }
+    reader.readAsDataURL(file)
+  })
 }
 
 function resolveScore(u: { score?: number; gpsLat?: number }) {
