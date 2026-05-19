@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Trophy, Users, RefreshCw, Play, RotateCcw, Gift, Dices, Star, Drama, SpellCheck2,
-  MapPin, CheckCircle, XCircle, RefreshCcw, History, ChevronDown, ChevronUp, Send,
+  MapPin, CheckCircle, XCircle, RefreshCcw, History, ChevronDown, ChevronUp, Send, Mic,
 } from 'lucide-react'
 
 interface ActiveUser {
@@ -53,11 +53,12 @@ interface HistoryEntry {
   savedAt: number
 }
 
-const METHOD_OPTIONS: { value: RaffleMethod; label: string; desc: string; icon: React.ReactNode }[] = [
+const METHOD_OPTIONS: { value: RaffleMethod; label: string; desc: string; icon: React.ReactNode; comingSoon?: boolean }[] = [
   { value: 'random',     label: '완전 랜덤',    desc: '참여자 중 무작위 선택',           icon: <Dices size={16} /> },
   { value: 'score',      label: '점수 높은 분', desc: 'Presence Score 상위권 우선',     icon: <Star size={16} /> },
   { value: 'one-by-one', label: '한 명씩 공개', desc: '드라마틱하게 한 명씩 발표',       icon: <Drama size={16} /> },
   { value: 'chosung',    label: '초성 퀴즈',    desc: '정답 맞힌 사람만 추첨 풀 포함',   icon: <SpellCheck2 size={16} /> },
+  { value: 'random',     label: '음성 추첨',    desc: '"3명 추첨해줘" 한 마디로 바로',   icon: <Mic size={16} />, comingSoon: true },
 ]
 
 const CONFIRM_WINDOW_MS = 15000
@@ -276,8 +277,20 @@ export default function AdminPage() {
 
                 <Field label="추첨 방식">
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    {METHOD_OPTIONS.map(m => (
-                      <button key={m.value} onClick={() => setForm(f => ({ ...f, method: m.value }))}
+                    {METHOD_OPTIONS.map((m, idx) => m.comingSoon ? (
+                      <div key={`${m.value}-${idx}`}
+                        style={{ padding: 14, borderRadius: 12, textAlign: 'left', position: 'relative',
+                          background: '#18181b', border: '1px solid #27272a', opacity: 0.6, cursor: 'not-allowed' }}>
+                        <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 9, fontWeight: 700,
+                          padding: '2px 6px', borderRadius: 20, background: '#1e1b4b', color: '#818cf8', border: '1px solid #312e81' }}>
+                          예정
+                        </div>
+                        <div style={{ color: '#52525b', marginBottom: 6 }}>{m.icon}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#71717a' }}>{m.label}</div>
+                        <div style={{ fontSize: 11, color: '#52525b', marginTop: 3, lineHeight: 1.4 }}>{m.desc}</div>
+                      </div>
+                    ) : (
+                      <button key={`${m.value}-${idx}`} onClick={() => setForm(f => ({ ...f, method: m.value }))}
                         style={{ padding: 14, borderRadius: 12, textAlign: 'left', cursor: 'pointer',
                           background: form.method === m.value ? 'rgba(74,222,128,0.08)' : '#27272a',
                           border: form.method === m.value ? '1px solid #4ade80' : '1px solid #3f3f46' }}>

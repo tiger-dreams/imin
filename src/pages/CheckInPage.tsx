@@ -279,6 +279,22 @@ export default function CheckInPage() {
 
         {/* Presence Score */}
         <PresenceScore geo={geo} gps={gps} checkedIn={checkedIn} />
+
+        {/* 예정 기능 */}
+        <div className="rounded-2xl p-5 space-y-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: '#1e1b4b', color: '#818cf8', border: '1px solid #312e81' }}>예정</span>
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Hackday에서 만들어올 기능들</span>
+          </div>
+          <ComingSoonItem
+            title="슬라이드 뷰어"
+            desc="발표 슬라이드 실시간 스트리밍 · 딸깍으로 저장 · 그 자리서 Q&A"
+          />
+          <ComingSoonItem
+            title="실시간 자막 · 번역"
+            desc="외국인 발표도 걱정 없이 · Live Caption · 전사 저장"
+          />
+        </div>
       </div>
     </div>
   )
@@ -338,6 +354,21 @@ function ScorePill({ label, pts, active }: { label: string; pts: number; active:
     >
       <div className="text-xs font-bold" style={{ color: active ? 'var(--green)' : 'var(--text-muted)' }}>+{pts}</div>
       <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)', fontSize: '10px' }}>{label}</div>
+    </div>
+  )
+}
+
+function ComingSoonItem({ title, desc }: { title: string; desc: string }) {
+  return (
+    <div
+      className="flex items-start gap-3 p-3 rounded-xl"
+      style={{ background: 'var(--bg-card2)', border: '1px solid var(--border)', opacity: 0.75 }}
+    >
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{title}</p>
+        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>{desc}</p>
+      </div>
+      <span className="shrink-0 text-xs px-2 py-0.5 rounded-full font-semibold mt-0.5" style={{ background: '#1e1b4b', color: '#818cf8', border: '1px solid #312e81' }}>준비 중</span>
     </div>
   )
 }
