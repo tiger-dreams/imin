@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Trophy, Users, RefreshCw, Play, RotateCcw, Gift, Dices, Star, Drama, SpellCheck2,
   MapPin, CheckCircle, XCircle, RefreshCcw, History, ChevronDown, ChevronUp, Send, Mic,
+  ImagePlus, X, Loader2,
 } from 'lucide-react'
 
 interface ActiveUser {
@@ -25,6 +26,7 @@ type RaffleStatus = 'idle' | 'open' | 'drawing' | 'result'
 interface RemoteRaffleState {
   status: RaffleStatus
   prize?: string
+  prizeImageUrl?: string
   count?: number
   method?: RaffleMethod
   chosung?: string
@@ -37,6 +39,7 @@ interface RemoteRaffleState {
 // 로컬 폼 설정 (서버 동기화와 무관)
 interface FormConfig {
   prize: string
+  prizeImageUrl?: string
   count: number
   method: RaffleMethod
   chosung: string
@@ -45,6 +48,7 @@ interface FormConfig {
 
 interface HistoryEntry {
   prize: string
+  prizeImageUrl?: string
   count: number
   method: RaffleMethod
   winners: WinnerEntry[]
@@ -62,12 +66,15 @@ const METHOD_OPTIONS: { value: RaffleMethod; label: string; desc: string; icon: 
 ]
 
 const CONFIRM_WINDOW_MS = 15000
-const DEFAULT_FORM: FormConfig = { prize: '', count: 1, method: 'random', chosung: '', allowedCities: [] }
+const DEFAULT_FORM: FormConfig = { prize: '', prizeImageUrl: undefined, count: 1, method: 'random', chosung: '', allowedCities: [] }
 
 export default function AdminPage() {
   const [users, setUsers] = useState<ActiveUser[]>([])
   const [loading, setLoading] = useState(true)
   const [remote, setRemote] = useState<RemoteRaffleState>({ status: 'idle' })
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const imageInputRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState<FormConfig>(DEFAULT_FORM)
   const [isDrawing, setIsDrawing] = useState(false)
   const [now, setNow] = useState(Date.now())
@@ -127,9 +134,38 @@ export default function AdminPage() {
   const eligiblePool = (pool: ActiveUser[]) =>
     form.allowedCities.length === 0 ? pool : pool.filter(u => form.allowedCities.includes(u.city))
 
+  const handlePrizeImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = async (ev) => {
+      const dataUrl = ev.target?.result as string
+      setImagePreview(dataUrl)
+      setUploadingImage(true)
+      try {
+        const res = await fetch('/api/raffle-prize-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: dataUrl, type: file.type }),
+        })
+        const json = await res.json() as { url: string }
+        setForm(f => ({ ...f, prizeImageUrl: json.url }))
+      } finally {
+        setUploadingImage(false)
+      }
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  const removePrizeImage = () => {
+    setImagePreview(null)
+    setForm(f => ({ ...f, prizeImageUrl: undefined }))
+  }
+
   const startRaffle = () => {
     const pool = eligiblePool(users)
-    pushRemote({ status: 'open', prize: form.prize, count: form.count, method: form.method, chosung: form.chosung, allowedCities: form.allowedCities, pool, winners: [] })
+    pushRemote({ status: 'open', prize: form.prize, prizeImageUrl: form.prizeImageUrl, count: form.count, method: form.method, chosung: form.chosung, allowedCities: form.allowedCities, pool, winners: [] })
   }
 
   const pickWinners = (pool: ActiveUser[], count: number, method: RaffleMethod): ActiveUser[] => {
@@ -169,7 +205,8 @@ export default function AdminPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prize: remote.prize, count: remote.count, method: remote.method,
+          prize: remote.prize, prizeImageUrl: remote.prizeImageUrl,
+          count: remote.count, method: remote.method,
           winners: remote.winners, pool: remote.pool, allowedCities: remote.allowedCities,
         }),
       })
@@ -261,6 +298,32 @@ export default function AdminPage() {
                   {form.prize && Number(form.prize.replace(/[^0-9]/g, '')) >= 50000 && (
                     <p style={{ fontSize: 11, color: '#facc15', marginTop: 6 }}>50,000원 이상 — 당첨자 제세공과금 정보 수집 필요</p>
                   )}
+
+                  {/* 상품 이미지 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+                    <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={handlePrizeImage} />
+                    <button type="button" onClick={() => imageInputRef.current?.click()}
+                      disabled={uploadingImage}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8,
+                        background: '#27272a', border: '1px solid #3f3f46', color: uploadingImage ? '#52525b' : '#a1a1aa',
+                        cursor: uploadingImage ? 'wait' : 'pointer', fontSize: 12 }}>
+                      {uploadingImage
+                        ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                        : <ImagePlus size={13} />}
+                      {uploadingImage ? '업로드 중...' : imagePreview ? '이미지 변경' : '이미지 추가'}
+                    </button>
+                    {imagePreview && !uploadingImage && (
+                      <>
+                        <img src={imagePreview} alt="prize"
+                          style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 8, border: '1px solid #3f3f46' }} />
+                        <button type="button" onClick={removePrizeImage}
+                          style={{ display: 'flex', alignItems: 'center', padding: 4, borderRadius: 6,
+                            background: 'none', border: 'none', color: '#52525b', cursor: 'pointer' }}>
+                          <X size={13} />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </Field>
 
                 <Field label="당첨 인원">
@@ -406,7 +469,7 @@ function HistoryCard({ entry }: { entry: HistoryEntry }) {
       await fetch('/api/raffle-notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, prize: entry.prize }),
+        body: JSON.stringify({ userId, prize: entry.prize, prizeImageUrl: entry.prizeImageUrl }),
       })
     } finally {
       setSending(null)
@@ -418,6 +481,9 @@ function HistoryCard({ entry }: { entry: HistoryEntry }) {
       <button onClick={() => setOpen(o => !o)}
         style={{ width: '100%', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', color: '#f4f4f5', textAlign: 'left' }}>
         <Trophy size={13} style={{ color: '#facc15', flexShrink: 0 }} />
+        {entry.prizeImageUrl && (
+          <img src={entry.prizeImageUrl} alt="" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
+        )}
         <span style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{entry.prize || '(상품 없음)'}</span>
         <span style={{ fontSize: 11, color: '#71717a' }}>{date}</span>
         <span style={{ fontSize: 11, color: '#4ade80' }}>{confirmed}/{entry.winners.length}명 확인</span>
