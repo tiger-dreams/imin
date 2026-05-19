@@ -90,7 +90,7 @@ export default function CheckInPage() {
     <div className="min-h-dvh pb-8" style={{ background: 'var(--bg)' }}>
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-safe-area-inset-top pt-6 pb-4">
-        <span className="text-2xl font-bold" style={{ color: 'var(--text)' }}>imin</span>
+        <img src="/logo.png" alt="imin" className="h-7" />
         <button onClick={logout} className="p-2 rounded-xl transition-opacity active:opacity-60" style={{ background: 'var(--bg-card)' }}>
           <LogOut size={16} style={{ color: 'var(--text-muted)' }} />
         </button>

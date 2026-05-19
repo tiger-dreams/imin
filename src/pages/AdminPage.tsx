@@ -185,7 +185,10 @@ export default function AdminPage() {
         {/* 헤더 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <div>
-            <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>imin <span style={{ color: '#4ade80' }}>Admin</span></h1>
+            <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <img src="/logo.png" alt="imin" style={{ height: 28 }} />
+              <span style={{ color: '#4ade80' }}>Admin</span>
+            </h1>
             <p style={{ fontSize: 13, color: '#71717a', marginTop: 4 }}>Tech Week Hackathon Idea Competition KR</p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
