@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { MapPin, Wifi, Globe, Trophy, RefreshCw, LogOut, CheckCircle } from 'lucide-react'
+import { MapPin, Wifi, Globe, Trophy, RefreshCw, LogOut, CheckCircle, MessageSquare, Send } from 'lucide-react'
 import { useLiff } from '../contexts/LiffContext'
 
 interface GeoInfo {
@@ -38,6 +38,9 @@ export default function CheckInPage() {
   const [gps, setGps] = useState<GpsInfo>({ lat: 0, lon: 0, accuracy: 0, status: 'idle' })
   const [checkedIn, setCheckedIn] = useState(false)
   const [raffle, setRaffle] = useState<RaffleState>({ status: 'idle', winner: null, pool: DEMO_POOL })
+  const [wallMsg, setWallMsg] = useState('')
+  const [sentWallMsg, setSentWallMsg] = useState<string | null>(null)
+  const [sendingWall, setSendingWall] = useState(false)
 
   // GeoIP fetch — ipapi.co supports HTTPS on free tier
   const fetchGeo = useCallback(async () => {
@@ -85,6 +88,22 @@ export default function CheckInPage() {
   }
 
   const resetRaffle = () => setRaffle(prev => ({ ...prev, status: 'idle', winner: null }))
+
+  const sendWallMsg = async () => {
+    if (!wallMsg.trim() || sendingWall) return
+    setSendingWall(true)
+    try {
+      await fetch('/api/wall-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: wallMsg.trim(), displayName: profile?.displayName, userId: profile?.userId }),
+      })
+      setSentWallMsg(wallMsg.trim())
+      setWallMsg('')
+    } finally {
+      setSendingWall(false)
+    }
+  }
 
   return (
     <div className="min-h-dvh pb-8" style={{ background: 'var(--bg)' }}>
@@ -279,6 +298,46 @@ export default function CheckInPage() {
 
         {/* Presence Score */}
         <PresenceScore geo={geo} gps={gps} checkedIn={checkedIn} />
+
+        {/* 메시지 월 */}
+        {checkedIn && (
+          <div className="rounded-2xl p-5 space-y-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <div className="flex items-center gap-2">
+              <MessageSquare size={16} style={{ color: '#818cf8' }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>한 마디 남기기</span>
+            </div>
+            {sentWallMsg ? (
+              <div className="rounded-xl px-4 py-3 flex items-start gap-3" style={{ background: '#0f0e1c', border: '1px solid #312e81' }}>
+                <span style={{ color: '#818cf8', marginTop: 1 }}>✓</span>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: '#818cf8' }}>화면에 게시됐어요!</p>
+                  <p className="text-xs mt-0.5" style={{ color: '#52525b' }}>"{sentWallMsg}"</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  value={wallMsg}
+                  onChange={e => setWallMsg(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && sendWallMsg()}
+                  placeholder="지금 느끼는 한 마디..."
+                  maxLength={50}
+                  className="flex-1 rounded-xl px-4 text-sm outline-none"
+                  style={{ background: 'var(--bg-card2)', border: '1px solid var(--border)', color: 'var(--text)',
+                    padding: '11px 14px', fontFamily: 'inherit' }}
+                />
+                <button
+                  onClick={sendWallMsg}
+                  disabled={!wallMsg.trim() || sendingWall}
+                  className="px-4 rounded-xl flex items-center justify-center transition-opacity active:opacity-70 disabled:opacity-30"
+                  style={{ background: '#312e81', border: 'none', cursor: wallMsg.trim() ? 'pointer' : 'default' }}
+                >
+                  <Send size={15} style={{ color: '#818cf8' }} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 예정 기능 */}
         <div className="rounded-2xl p-5 space-y-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>

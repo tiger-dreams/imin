@@ -4,9 +4,12 @@ import LoginPage from './pages/LoginPage'
 import VerifyPage from './pages/VerifyPage'
 import MainPage from './pages/MainPage'
 import AdminPage from './pages/AdminPage'
+import AdminHubPage from './pages/AdminHubPage'
+import AdminWallPage from './pages/AdminWallPage'
+import WallPage from './pages/WallPage'
 import type { LocationData } from './pages/VerifyPage'
 
-const isAdmin = window.location.pathname === '/admin'
+const path = window.location.pathname
 
 function AppRoutes() {
   const { isLoggedIn, isInitialized } = useLiff()
@@ -29,7 +32,10 @@ function AppRoutes() {
 }
 
 export default function App() {
-  if (isAdmin) return <AdminPage />
+  if (path === '/wall') return <WallPage />
+  if (path === '/admin/raffle') return <AdminPage />
+  if (path === '/admin/wall') return <AdminWallPage />
+  if (path === '/admin') return <AdminHubPage />
 
   return (
     <LiffProvider>
