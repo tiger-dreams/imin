@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Trophy, Wifi, CheckCircle, LogOut, ChevronRight, CalendarDays, MessageCircleQuestion,
   HelpCircle, PartyPopper, Info, X, Star,
-  MonitorPlay, LayoutGrid, Camera, Send, MessageSquare, ExternalLink, Play, ArrowLeft,
+  MonitorPlay, LayoutGrid, Camera, Send, MessageSquare, ExternalLink, Play, Pause,
+  ArrowLeft, ChevronLeft, ChevronRight as ChevronRightIcon,
 } from 'lucide-react'
 import { useLiff } from '../contexts/LiffContext'
 import type { LocationData } from './VerifyPage'
@@ -133,6 +134,9 @@ export default function MainPage({ location }: Props) {
 }
 
 // ── 발표 뷰어 페이지 ────────────────────────────────────────────
+const TOTAL_SLIDES = 5
+const AUTO_INTERVAL = 5000  // 5초 자동 넘김
+
 const SLIDE_TABS: { id: SlideTab; label: string; icon: React.ReactNode }[] = [
   { id: 'live',   label: '발표 보기', icon: <MonitorPlay size={14} /> },
   { id: 'slides', label: '슬라이드',  icon: <LayoutGrid size={14} /> },
@@ -142,13 +146,32 @@ const SLIDE_TABS: { id: SlideTab; label: string; icon: React.ReactNode }[] = [
 
 function SlidesView({ onBack }: { onBack: () => void }) {
   const [activeTab, setActiveTab] = useState<SlideTab>('live')
+  const [current, setCurrent] = useState(0)             // 0-based index
+  const [playing, setPlaying] = useState(true)
   const [qaText, setQaText] = useState('')
   const [qaSent, setQaSent] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // 자동 슬라이드쇼
+  useEffect(() => {
+    if (!playing || activeTab !== 'live') { timerRef.current && clearInterval(timerRef.current); return }
+    timerRef.current = setInterval(() => setCurrent(c => (c + 1) % TOTAL_SLIDES), AUTO_INTERVAL)
+    return () => { timerRef.current && clearInterval(timerRef.current) }
+  }, [playing, activeTab])
+
+  const go = (idx: number) => {
+    setCurrent(idx)
+    // 수동 이동 시 타이머 리셋
+    if (timerRef.current) { clearInterval(timerRef.current) }
+    if (playing) {
+      timerRef.current = setInterval(() => setCurrent(c => (c + 1) % TOTAL_SLIDES), AUTO_INTERVAL)
+    }
+  }
 
   return (
     <div className="min-h-dvh flex flex-col" style={{ background: 'var(--bg)' }}>
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 pt-6 pb-4">
+      <div className="flex items-center gap-3 px-4 pt-6 pb-3">
         <button onClick={onBack} style={{ background: 'var(--bg-card)', border: 'none', borderRadius: 12, padding: '8px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
           <ArrowLeft size={16} style={{ color: 'var(--text-muted)' }} />
         </button>
@@ -174,49 +197,85 @@ function SlidesView({ onBack }: { onBack: () => void }) {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {/* Live stream */}
+
+        {/* ── 발표 보기: 자동 슬라이드쇼 ── */}
         {activeTab === 'live' && (
           <div>
-            <div style={{ aspectRatio: '16/9', background: '#09090b', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
-              <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', alignItems: 'center', gap: 6,
-                padding: '4px 10px', borderRadius: 20, background: 'rgba(239,68,68,0.15)', border: '1px solid #ef4444' }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444', display: 'inline-block',
-                  animation: 'livepulse 1.5s ease infinite' }} />
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#ef4444' }}>LIVE</span>
+            {/* 슬라이드 이미지 */}
+            <div style={{ position: 'relative', background: '#000', lineHeight: 0 }}>
+              <img
+                key={current}
+                src={`/slides/slide-${current + 1}.jpg`}
+                alt={`slide ${current + 1}`}
+                style={{ width: '100%', display: 'block', transition: 'opacity 0.4s ease', opacity: 1 }}
+              />
+              {/* Prev / Next 오버레이 */}
+              <button onClick={() => go((current - 1 + TOTAL_SLIDES) % TOTAL_SLIDES)}
+                style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '25%', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', paddingLeft: 8 }}>
+                <span style={{ background: 'rgba(0,0,0,0.45)', borderRadius: 20, padding: '6px 7px', display: 'flex' }}>
+                  <ChevronLeft size={18} style={{ color: '#fff' }} />
+                </span>
+              </button>
+              <button onClick={() => go((current + 1) % TOTAL_SLIDES)}
+                style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '25%', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 8 }}>
+                <span style={{ background: 'rgba(0,0,0,0.45)', borderRadius: 20, padding: '6px 7px', display: 'flex' }}>
+                  <ChevronRightIcon size={18} style={{ color: '#fff' }} />
+                </span>
+              </button>
+            </div>
+
+            {/* 컨트롤바 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', background: 'var(--bg-card)', borderTop: '1px solid var(--border)' }}>
+              {/* 자동재생 토글 */}
+              <button onClick={() => setPlaying(p => !p)}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 20,
+                  background: playing ? 'rgba(74,222,128,0.1)' : '#27272a',
+                  border: playing ? '1px solid var(--green-dim)' : '1px solid #3f3f46',
+                  color: playing ? 'var(--green)' : '#71717a', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                {playing ? <><Pause size={12} /> 자동</>  : <><Play size={12} /> 자동</>}
+              </button>
+              {/* 인디케이터 */}
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                {Array.from({ length: TOTAL_SLIDES }, (_, i) => (
+                  <button key={i} onClick={() => go(i)}
+                    style={{ width: i === current ? 20 : 7, height: 7, borderRadius: 4, border: 'none', cursor: 'pointer', padding: 0, transition: 'all 0.25s',
+                      background: i === current ? 'var(--green)' : '#3f3f46' }} />
+                ))}
               </div>
-              <MonitorPlay size={48} style={{ color: '#3f3f46' }} />
-              <p style={{ fontSize: 14, color: '#52525b', margin: 0 }}>스트리밍 준비 중</p>
-              <p style={{ fontSize: 12, color: '#3f3f46', margin: 0 }}>발표가 시작되면 여기서 볼 수 있어요</p>
+              {/* 페이지 */}
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 36, textAlign: 'right' }}>{current + 1} / {TOTAL_SLIDES}</span>
             </div>
-            <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 8,
-              background: 'var(--bg-card)', borderTop: '1px solid var(--border)' }}>
-              <Play size={13} style={{ color: 'var(--green)', flexShrink: 0 }} />
-              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>라이브 화면이 시작되면 여기에 표시됩니다</span>
-            </div>
+
+            {/* 진행 바 (자동재생 중일 때) */}
+            {playing && (
+              <div style={{ height: 2, background: 'var(--border)' }}>
+                <div key={`${current}-${playing}`} style={{ height: '100%', background: 'var(--green)',
+                  animation: `slideprog ${AUTO_INTERVAL}ms linear` }} />
+              </div>
+            )}
           </div>
         )}
 
-        {/* Slides */}
+        {/* ── 슬라이드 그리드 ── */}
         {activeTab === 'slides' && (
-          <div style={{ padding: 16 }}>
+          <div style={{ padding: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {['표지', '문제 정의', '솔루션', '데모', '기술 스택', '팀 소개'].map((title, i) => (
-                <div key={i} style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)', cursor: 'pointer' }}>
-                  <div style={{ aspectRatio: '16/9', background: i === 0 ? '#0d2818' : '#27272a',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8 }}>
-                    <span style={{ fontSize: 12, color: i === 0 ? 'var(--green)' : 'var(--text-muted)', fontWeight: i === 0 ? 700 : 400, textAlign: 'center' }}>{title}</span>
+              {Array.from({ length: TOTAL_SLIDES }, (_, i) => (
+                <button key={i} onClick={() => { setActiveTab('live'); go(i) }}
+                  style={{ borderRadius: 10, overflow: 'hidden', border: i === current ? '2px solid var(--green)' : '1px solid var(--border)', cursor: 'pointer', background: 'none', padding: 0 }}>
+                  <img src={`/slides/slide-${i + 1}.jpg`} alt={`slide ${i + 1}`} style={{ width: '100%', display: 'block' }} />
+                  <div style={{ padding: '5px 8px', background: 'var(--bg-card2)', textAlign: 'left' }}>
+                    <span style={{ fontSize: 10, color: i === current ? 'var(--green)' : 'var(--text-muted)', fontWeight: i === current ? 700 : 400 }}>
+                      {i === current ? '▶ ' : ''}p.{i + 1}
+                    </span>
                   </div>
-                  <div style={{ padding: '5px 8px', background: 'var(--bg-card2)' }}>
-                    <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>p.{i + 1}</span>
-                  </div>
-                </div>
+                </button>
               ))}
             </div>
-            <p style={{ fontSize: 12, color: '#52525b', textAlign: 'center', marginTop: 16 }}>발표 후 전체 슬라이드가 공개될 예정이에요</p>
           </div>
         )}
 
-        {/* Photos */}
+        {/* ── 사진 ── */}
         {activeTab === 'photos' && (
           <div style={{ padding: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
@@ -231,7 +290,7 @@ function SlidesView({ onBack }: { onBack: () => void }) {
           </div>
         )}
 
-        {/* Q&A */}
+        {/* ── Q&A ── */}
         {activeTab === 'qa' && (
           <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
             {[
@@ -241,8 +300,8 @@ function SlidesView({ onBack }: { onBack: () => void }) {
             ].map((item, i) => (
               <div key={i} style={{ padding: '12px 14px', borderRadius: 12, background: 'var(--bg-card)', border: '1px solid var(--border)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                 <button style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                  background: 'none', border: 'none', cursor: 'pointer', color: '#71717a', flexShrink: 0 }}>
-                  <span style={{ fontSize: 12 }}>▲</span>
+                  background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
+                  <span style={{ fontSize: 12, color: '#71717a' }}>▲</span>
                   <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--green)' }}>{item.votes}</span>
                 </button>
                 <p style={{ fontSize: 13, color: '#e4e4e7', margin: 0, lineHeight: 1.5 }}>{item.q}</p>
@@ -254,18 +313,15 @@ function SlidesView({ onBack }: { onBack: () => void }) {
               </div>
             ) : (
               <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  value={qaText}
-                  onChange={e => setQaText(e.target.value)}
-                  placeholder="연사에게 질문을 남겨보세요..."
-                  maxLength={80}
+                <input value={qaText} onChange={e => setQaText(e.target.value)}
+                  placeholder="연사에게 질문을 남겨보세요..." maxLength={80}
                   style={{ flex: 1, padding: '11px 14px', borderRadius: 12, fontSize: 13,
                     background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)',
-                    outline: 'none', fontFamily: 'inherit' }}
-                />
+                    outline: 'none', fontFamily: 'inherit' }} />
                 <button onClick={() => { if (qaText.trim()) { setQaSent(true); setQaText('') } }}
                   disabled={!qaText.trim()}
-                  style={{ padding: '11px 14px', borderRadius: 12, background: qaText.trim() ? '#0d2818' : '#27272a',
+                  style={{ padding: '11px 14px', borderRadius: 12,
+                    background: qaText.trim() ? '#0d2818' : '#27272a',
                     border: qaText.trim() ? '1px solid var(--green-dim)' : '1px solid #3f3f46',
                     color: qaText.trim() ? 'var(--green)' : '#52525b', cursor: qaText.trim() ? 'pointer' : 'default' }}>
                   <Send size={14} />
@@ -275,7 +331,10 @@ function SlidesView({ onBack }: { onBack: () => void }) {
           </div>
         )}
       </div>
-      <style>{`@keyframes livepulse { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
+      <style>{`
+        @keyframes slideprog { from { width: 0% } to { width: 100% } }
+        @keyframes livepulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+      `}</style>
     </div>
   )
 }
