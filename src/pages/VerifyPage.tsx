@@ -29,6 +29,7 @@ export default function VerifyPage({ onVerified }: Props) {
 
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'loading' | 'ok' | 'denied' | 'error'>('idle')
   const [gpsData, setGpsData] = useState<{ lat: number; lon: number; accuracy: number } | null>(null)
+  const [gpsAddress, setGpsAddress] = useState<string | null>(null)
 
   const fetchGeo = useCallback(async () => {
     setGeoStatus('loading')
@@ -53,10 +54,36 @@ export default function VerifyPage({ onVerified }: Props) {
 
   const requestGps = () => {
     setGpsStatus('loading')
+    setGpsAddress(null)
     navigator.geolocation.getCurrentPosition(
-      pos => {
-        setGpsData({ lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy })
+      async pos => {
+        const { latitude: lat, longitude: lon, accuracy } = pos.coords
+        setGpsData({ lat, lon, accuracy })
         setGpsStatus('ok')
+        // 역지오코딩 — Nominatim (무료, 키 불필요)
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=ko`,
+            { headers: { 'Accept-Language': 'ko' } }
+          )
+          const json = await res.json() as {
+            address?: {
+              road?: string; quarter?: string; suburb?: string
+              city?: string; town?: string; county?: string
+              state?: string; country?: string
+            }
+          }
+          const a = json.address ?? {}
+          const parts = [
+            a.state,
+            a.city ?? a.town ?? a.county,
+            a.suburb ?? a.quarter,
+            a.road,
+          ].filter(Boolean)
+          setGpsAddress(parts.length > 0 ? parts.join(' ') : null)
+        } catch {
+          // 주소 조회 실패해도 GPS 자체는 성공으로 유지
+        }
       },
       err => setGpsStatus(err.code === 1 ? 'denied' : 'error'),
       { enableHighAccuracy: true, timeout: 10000 }
@@ -179,8 +206,10 @@ export default function VerifyPage({ onVerified }: Props) {
           {gpsStatus === 'loading' && <p className="text-sm" style={{ color: 'var(--text-muted)' }}>위치 확인 중...</p>}
           {gpsStatus === 'ok' && gpsData && (
             <div className="space-y-1.5">
-              <Row label="위도" value={gpsData.lat.toFixed(6)} />
-              <Row label="경도" value={gpsData.lon.toFixed(6)} />
+              {gpsAddress
+                ? <Row label="주소" value={gpsAddress} />
+                : <Row label="좌표" value={`${gpsData.lat.toFixed(5)}, ${gpsData.lon.toFixed(5)}`} />
+              }
               <Row label="정확도" value={`±${Math.round(gpsData.accuracy)}m`} />
               {/* 지도 미리보기 */}
               <div className="mt-2 rounded-xl overflow-hidden" style={{ height: 160 }}>
