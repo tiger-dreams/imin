@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { LiffProvider, useLiff } from './contexts/LiffContext'
 import LoginPage from './pages/LoginPage'
 import VerifyPage from './pages/VerifyPage'
@@ -7,11 +7,10 @@ import AdminPage from './pages/AdminPage'
 import AdminHubPage from './pages/AdminHubPage'
 import AdminWallPage from './pages/AdminWallPage'
 import WallPage from './pages/WallPage'
+import EventPlatformPage from './pages/EventPlatformPage'
 import type { LocationData } from './pages/VerifyPage'
 
-const path = window.location.pathname
-
-function AppRoutes() {
+function AppRoutes({ path }: { path: string }) {
   const { isLoggedIn, isInitialized } = useLiff()
   const [location, setLocation] = useState<LocationData | null>(null)
 
@@ -27,11 +26,27 @@ function AppRoutes() {
   }
 
   if (!isLoggedIn) return <LoginPage />
+
+  if (path === '/checkin') {
+    if (!location) return <VerifyPage onVerified={setLocation} />
+    return <MainPage location={location} />
+  }
+
+  if (path === '/' || path.startsWith('/events')) return <EventPlatformPage />
+
   if (!location) return <VerifyPage onVerified={setLocation} />
   return <MainPage location={location} />
 }
 
 export default function App() {
+  const [path, setPath] = useState(window.location.pathname)
+
+  useEffect(() => {
+    const syncPath = () => setPath(window.location.pathname)
+    window.addEventListener('popstate', syncPath)
+    return () => window.removeEventListener('popstate', syncPath)
+  }, [])
+
   if (path === '/wall') return <WallPage />
   if (path === '/admin/raffle') return <AdminPage />
   if (path === '/admin/wall') return <AdminWallPage />
@@ -39,7 +54,7 @@ export default function App() {
 
   return (
     <LiffProvider>
-      <AppRoutes />
+      <AppRoutes path={path} />
     </LiffProvider>
   )
 }
