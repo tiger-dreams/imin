@@ -988,7 +988,7 @@ async function createEvent(payload: EventFormState & { hostUserId: string; hostN
 
 async function fetchRsvp(eventId: string, userId: string) {
   if (useLocalEventStore()) return readLocalRsvp(eventId, userId)
-  const res = await fetch(`/api/event-rsvp?eventId=${encodeURIComponent(eventId)}&userId=${encodeURIComponent(userId)}`, { cache: 'no-store' })
+  const res = await fetch(`/api/events?action=rsvp&eventId=${encodeURIComponent(eventId)}&userId=${encodeURIComponent(userId)}`, { cache: 'no-store' })
   if (!res.ok) return null
   const json = await res.json() as { rsvp: EventRsvp | null }
   return json.rsvp
@@ -999,10 +999,10 @@ async function saveRsvp(eventId: string, payload: { userId: string; displayName:
     return writeLocalRsvp({ eventId, ...payload, createdAt: Date.now(), updatedAt: Date.now() })
   }
   try {
-    const res = await fetch('/api/event-rsvp', {
+    const res = await fetch('/api/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ eventId, ...payload }),
+      body: JSON.stringify({ action: 'rsvp', eventId, ...payload }),
     })
     if (!res.ok) throw new Error('rsvp failed')
     const json = await res.json() as { rsvp: EventRsvp }

@@ -39,6 +39,7 @@ Do not call a release task done until it is release-ready. Do not push unless th
 6. Run local verification:
    - `git diff --check`
    - `npm run build`
+   - `find api -maxdepth 1 -type f -name '*.ts' | wc -l` and confirm the count is 12 or fewer for Vercel Hobby.
    - `node --check` for changed JavaScript files when applicable
    - API smoke checks for changed Vercel functions when feasible
    - Browser checks for changed routes, including `/`, `/admin`, `/admin/raffle`, `/admin/wall`, and `/wall` when relevant

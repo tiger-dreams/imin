@@ -27,6 +27,7 @@ This file provides guidance to Codex when working in this repository.
 - Deployment target is Vercel.
 - Push to the connected GitHub branch may trigger Vercel deployment, depending on project settings.
 - Do not push unless the user explicitly asks for push.
+- Vercel Hobby plan allows no more than 12 serverless functions per deployment. This repository must keep `api/*.ts` at 12 files or fewer unless the project moves to a Pro team. Before adding a new API file, prefer merging related handlers into an existing function and route by query/body action.
 - Vercel environment variables must be configured in the Vercel dashboard for deployed behavior:
   - `VITE_LIFF_ID`
   - `UPSTASH_REDIS_REST_URL`
@@ -74,6 +75,7 @@ Before declaring GSD done for a release, production fix, or push:
 6. Run local verification:
    - `git diff --check`
    - `npm run build`
+   - `find api -maxdepth 1 -type f -name '*.ts' | wc -l` and confirm the count is 12 or fewer for Vercel Hobby.
    - `node --check` for changed JavaScript files when applicable.
    - API smoke checks for changed Vercel functions when feasible.
    - Browser checks for changed routes, including `/`, `/admin`, `/admin/raffle`, `/admin/wall`, and `/wall` when relevant.

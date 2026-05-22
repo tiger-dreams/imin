@@ -11,7 +11,7 @@ Scope: Event creation API, RSVP API, mobile event platform UI, profile settings,
 - Ran local verification:
   - `git diff --check`
   - `npm run build`
-  - `npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution bundler --skipLibCheck --types node api/events.ts api/event-rsvp.ts`
+  - `npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution bundler --skipLibCheck --types node api/events.ts`
   - Playwright mobile flow over `http://127.0.0.1:3000/`
 
 ## Findings
@@ -32,6 +32,15 @@ The UI correctly fell back to localStorage when Vite returned 404 for Vercel fun
 Resolution:
 
 - Added a localhost Vite local-store mode for event list/detail/create/RSVP calls so local QA does not hit missing Vercel API routes.
+
+### P1: New event APIs exceeded Vercel Hobby function limit
+
+Adding `api/events.ts` and `api/event-rsvp.ts` increased the project to 13 serverless functions, exceeding the Hobby plan limit of 12.
+
+Resolution:
+
+- Merged RSVP endpoints into `api/events.ts` using `action=rsvp`.
+- Removed `api/event-rsvp.ts`, leaving 12 API function files.
 
 ## No Blocking Findings
 
@@ -58,8 +67,11 @@ Pass
 npm run build
 Pass. Vite build completed; non-blocking warnings for eruda eval and chunk size.
 
-npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution bundler --skipLibCheck --types node api/events.ts api/event-rsvp.ts
+npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution bundler --skipLibCheck --types node api/events.ts
 Pass
+
+find api -maxdepth 1 -type f -name '*.ts' | wc -l
+12
 
 Playwright mobile flow
 home=true, create=true, rsvp=true, errors=[]

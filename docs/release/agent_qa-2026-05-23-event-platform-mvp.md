@@ -24,7 +24,8 @@ Hosts should be able to create a mobile invitation-style event page, share a sta
 | --- | --- | --- |
 | Diff whitespace | `git diff --check` | Pass |
 | Production build | `npm run build` | Pass. Vite warned about `eruda` eval and chunk size, both existing/non-blocking build warnings. |
-| API TypeScript | `npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution bundler --skipLibCheck --types node api/events.ts api/event-rsvp.ts` | Pass |
+| API TypeScript | `npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution bundler --skipLibCheck --types node api/events.ts` | Pass |
+| Vercel function count | `find api -maxdepth 1 -type f -name '*.ts' | wc -l` | Pass: 12 functions, within Hobby plan limit |
 | API smoke | Local Vite uses localStorage fallback; deployed API smoke remains pending until Vercel preview has Redis env. | Not run locally |
 
 ## Browser Assertions
@@ -59,6 +60,15 @@ Resolution:
 
 - Made the top-level app route reactive to `popstate`.
 - Changed the button to push `/checkin` into browser history and dispatch `popstate`, preserving the current LIFF/dev login context.
+
+### P1: Vercel Hobby deployment exceeded serverless function limit
+
+The first pushed deployment added both `api/events.ts` and `api/event-rsvp.ts`, bringing the project to 13 serverless functions. Vercel Hobby allows no more than 12 functions per deployment.
+
+Resolution:
+
+- Merged RSVP read/write handling into `api/events.ts` with `action=rsvp`.
+- Removed `api/event-rsvp.ts`, bringing the deployment back to 12 functions.
 
 ## Final Status
 

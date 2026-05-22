@@ -23,6 +23,7 @@ Required when the release changes UX judgment, interaction behavior, visual affo
 | --- | --- | --- |
 | Diff whitespace | `git diff --check` | <pass/fail> |
 | Production build | `npm run build` | <pass/fail> |
+| Vercel function count | `find api -maxdepth 1 -type f -name '*.ts' \| wc -l` | <pass/fail; must be <=12 on Hobby> |
 | JS syntax | `node --check <files>` | <pass/fail or n/a> |
 | API smoke | `<command or browser flow>` | <pass/fail or n/a> |
 

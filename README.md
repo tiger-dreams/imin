@@ -49,7 +49,7 @@ LINE 로그인 (LIFF)
 imin/
 ├── api/                    # Vercel Serverless Functions
 │   ├── events.ts           # GET/POST /api/events — 행사 목록/상세/생성
-│   ├── event-rsvp.ts       # GET/POST /api/event-rsvp — 참석 응답 조회/저장
+│   │                       # action=rsvp — 참석 응답 조회/저장
 │   ├── checkin.ts          # POST /api/checkin — 체크인 & Redis 등록
 │   ├── active.ts           # GET  /api/active  — 실시간 접속자 목록
 │   ├── heartbeat.ts        # POST /api/heartbeat — TTL 갱신
@@ -80,7 +80,7 @@ cp .env.example .env
 npm run dev
 ```
 
-localhost에서는 LIFF 없이 Dev mode로 자동 실행된다. Vite dev server만 사용할 때는 Vercel API가 없으므로 행사 생성/RSVP가 localStorage fallback으로 동작한다. 실제 배포/preview에서는 `/api/events`, `/api/event-rsvp`가 Upstash Redis에 저장한다.
+localhost에서는 LIFF 없이 Dev mode로 자동 실행된다. Vite dev server만 사용할 때는 Vercel API가 없으므로 행사 생성/RSVP가 localStorage fallback으로 동작한다. 실제 배포/preview에서는 `/api/events`가 행사와 RSVP를 Upstash Redis에 저장한다.
 
 ### 환경변수
 

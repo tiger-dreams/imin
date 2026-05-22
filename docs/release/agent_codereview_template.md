@@ -12,6 +12,7 @@ Scope: <short description of the diff reviewed before commit/push>
 - Run or cross-check local verification:
   - `git diff --check`
   - `npm run build`
+  - `find api -maxdepth 1 -type f -name '*.ts' | wc -l` and confirm the count is 12 or fewer for Vercel Hobby
   - `node --check` for changed JavaScript files when applicable
   - API smoke checks for changed Vercel functions when feasible
   - Browser route checks for changed UI surfaces

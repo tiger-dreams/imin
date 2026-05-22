@@ -4,6 +4,7 @@ type EventType = 'offline' | 'online' | 'hybrid'
 type EventVisibility = 'public' | 'private'
 type ApprovalMode = 'auto' | 'manual'
 type EventCategory = 'wedding' | 'party' | 'conference' | 'meetup'
+type RsvpStatus = 'attending' | 'maybe' | 'declined'
 
 interface EventRecord {
   id: string
@@ -122,8 +123,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!REDIS_URL || !REDIS_TOKEN) return res.status(503).json({ error: 'Redis not configured' })
 
   if (req.method === 'GET') {
+    const action = text(req.query.action)
     const id = text(req.query.id)
     const hostUserId = text(req.query.hostUserId)
+    const eventId = text(req.query.eventId)
+    const userId = text(req.query.userId)
+
+    if (action === 'rsvp') {
+      if (!eventId) return res.status(400).json({ error: 'eventId required' })
+
+      if (userId) {
+        const raw = await cmd(['HGET', rsvpKey(eventId), userId]) as string | null
+        return res.status(200).json({ rsvp: raw ? JSON.parse(raw) : null })
+      }
+
+      const rows = await cmd(['HVALS', rsvpKey(eventId)]) as string[] | null
+      return res.status(200).json({ rsvps: (rows ?? []).map(row => JSON.parse(row)) })
+    }
 
     if (id) {
       const raw = await cmd(['GET', eventKey(id)]) as string | null
@@ -144,6 +160,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'POST') {
     const body = req.body as Record<string, unknown>
+    if (body.action === 'rsvp') {
+      const id = text(body.eventId)
+      const uid = text(body.userId)
+      if (!id) return res.status(400).json({ error: 'eventId required' })
+      if (!uid) return res.status(400).json({ error: 'userId required' })
+
+      const eventExists = await cmd(['EXISTS', eventKey(id)]) as number
+      if (!eventExists) return res.status(404).json({ error: 'Event not found' })
+
+      const previousRaw = await cmd(['HGET', rsvpKey(id), uid]) as string | null
+      const previous = previousRaw ? JSON.parse(previousRaw) as { createdAt?: number } : null
+      const now = Date.now()
+      const rsvp = {
+        eventId: id,
+        userId: uid,
+        displayName: text(body.displayName, '참석자').slice(0, 80),
+        pictureUrl: text(body.pictureUrl).slice(0, 500) || undefined,
+        status: oneOf(body.status, ['attending', 'maybe', 'declined'] as const, 'attending') as RsvpStatus,
+        companions: Math.max(0, Math.min(10, Math.floor(Number(body.companions) || 0))),
+        message: text(body.message).slice(0, 500) || undefined,
+        createdAt: previous?.createdAt ?? now,
+        updatedAt: now,
+      }
+
+      await cmd(['HSET', rsvpKey(id), uid, JSON.stringify(rsvp)])
+      return res.status(200).json({ ok: true, rsvp })
+    }
+
     const title = text(body.title).slice(0, 120)
     const hostUserId = text(body.hostUserId).slice(0, 120)
     const hostName = text(body.hostName, '주최자').slice(0, 80)
