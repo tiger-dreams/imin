@@ -1,7 +1,7 @@
 # Agent Code Review - Event Platform MVP
 
 Date: 2026-05-23
-Scope: Event creation API, RSVP API, mobile event platform UI, profile settings, routing, and README/GSD docs
+Scope: Event creation API, participation/approval API, RSVP reconfirmation, mobile event platform UI, profile settings, routing, and README/GSD docs
 
 ## Review Method
 
@@ -42,6 +42,17 @@ Resolution:
 - Merged RSVP endpoints into `api/events.ts` using `action=rsvp`.
 - Removed `api/event-rsvp.ts`, leaving 12 API function files.
 
+### P1: Public events needed application/approval before RSVP
+
+The first MVP modeled the guest action as immediate RSVP. That was too weak for public events because hosts need to review applicants, confirm or waitlist them, and use RSVP later for final attendance and waitlist movement.
+
+Resolution:
+
+- Added `EventParticipation` with `applicationStatus` and optional `rsvpStatus`.
+- Added `action=participation` to `api/events.ts` for guest application, host status changes, and confirmed-participant RSVP reconfirmation.
+- Added host-side applicant management in the event detail page.
+- Preserved `action=rsvp` response aliases for compatibility while moving the UI to participation-first language.
+
 ## No Blocking Findings
 
 No remaining P0/P1/P2 blocking findings found after the fixes above.
@@ -50,8 +61,8 @@ Areas checked:
 
 - Event data model and Redis key structure
 - Event create/list/detail API behavior
-- RSVP create/read API behavior
-- Mobile event home, creation, invitation, and RSVP UI
+- Participation create/read/update API behavior
+- Mobile event home, creation, invitation, applicant management, and RSVP reconfirmation UI
 - Header logo/profile entry and local profile settings
 - Legacy route preservation for `/checkin`
 - Local fallback behavior for Vite dev server
@@ -81,6 +92,12 @@ urlReached=true, stayedLoggedIn=true, errors=[]
 
 Playwright profile settings flow
 hasLogo=true, hasProfile=true, saved=true, errors=[]
+
+Participation approval flow
+guestStatus=confirmed, errors=[]
+
+Confirmed participant RSVP reconfirmation flow
+myRsvp=maybe, errors=[]
 ```
 
 Residual risk:

@@ -5,7 +5,7 @@ import {
   MonitorPlay, Plus, Send, Share2, Sparkles, Ticket, UserRound, Users,
 } from 'lucide-react'
 import { useLiff } from '../contexts/LiffContext'
-import type { EventCategory, EventFormState, EventRecord, EventRsvp, EventType, RsvpStatus } from '../types/events'
+import type { ApplicationStatus, EventCategory, EventFormState, EventParticipation, EventRecord, EventType, RsvpStatus } from '../types/events'
 
 const DEFAULT_FORM: EventFormState = {
   title: '',
@@ -112,12 +112,12 @@ const SAMPLE_EVENTS: EventRecord[] = [
     contactNote: '자리가 좁아 동반 인원이 있으면 미리 알려주세요.',
     createdAt: Date.now() - 86400000,
     updatedAt: Date.now() - 86400000,
-    stats: { attending: 18, maybe: 6, declined: 1, total: 25 },
+    stats: { applied: 25, confirmed: 18, waitlisted: 4, pending: 3, rsvpAttending: 0, maybe: 0, declined: 0, total: 25 },
   },
 ]
 
 const STORAGE_EVENTS = 'imin:events:local'
-const STORAGE_RSVPS = 'imin:event-rsvps:local'
+const STORAGE_RSVPS = 'imin:event-participations:local'
 const STORAGE_PROFILE = 'imin:profile-settings:local'
 
 interface ProfileSettings {
@@ -155,7 +155,8 @@ export default function EventPlatformPage() {
   const [events, setEvents] = useState<EventRecord[]>([])
   const [myEvents, setMyEvents] = useState<EventRecord[]>([])
   const [selected, setSelected] = useState<EventRecord | null>(null)
-  const [myRsvp, setMyRsvp] = useState<EventRsvp | null>(null)
+  const [myParticipation, setMyParticipation] = useState<EventParticipation | null>(null)
+  const [participations, setParticipations] = useState<EventParticipation[]>([])
   const [loadState, setLoadState] = useState<LoadState>('idle')
 
   useEffect(() => {
@@ -193,12 +194,14 @@ export default function EventPlatformPage() {
     try {
       const event = await fetchEvent(id)
       setSelected(event)
-      if (profile?.userId) setMyRsvp(await fetchRsvp(id, profile.userId))
+      if (profile?.userId) setMyParticipation(await fetchParticipation(id, profile.userId))
+      if (profile?.userId && event.hostUserId === profile.userId) setParticipations(await fetchParticipations(id))
       setLoadState('ready')
     } catch {
       const event = [...readLocalEvents(), ...SAMPLE_EVENTS].find(item => item.id === id) ?? null
       setSelected(event)
-      setMyRsvp(profile?.userId ? readLocalRsvp(id, profile.userId) : null)
+      setMyParticipation(profile?.userId ? readLocalParticipation(id, profile.userId) : null)
+      setParticipations(event && profile?.userId === event.hostUserId ? readLocalParticipations(id) : [])
       setLoadState(event ? 'ready' : 'error')
     }
   }, [profile?.userId])
@@ -216,19 +219,35 @@ export default function EventPlatformPage() {
     return (
       <EventDetailPage
         event={selected}
-        rsvp={myRsvp}
+        participation={myParticipation}
+        participations={participations}
+        viewerUserId={profile?.userId}
         loadState={loadState}
         onBack={() => navigate('/')}
         onNavigate={navigate}
-        onRsvp={async payload => {
+        onApply={async payload => {
           if (!selected || !profile?.userId) return
-          const next = await saveRsvp(selected.id, {
+          const next = await saveParticipation(selected.id, {
             ...payload,
             userId: profile.userId,
             displayName: profile.displayName,
             pictureUrl: profile.pictureUrl,
           })
-          setMyRsvp(next)
+          setMyParticipation(next)
+          setParticipations(await safeReloadParticipations(selected.id))
+          setSelected(await safeReloadEvent(selected.id, selected))
+        }}
+        onHostUpdate={async (target, applicationStatus) => {
+          if (!selected) return
+          await saveParticipation(selected.id, {
+            userId: target.userId,
+            displayName: target.displayName,
+            pictureUrl: target.pictureUrl,
+            applicationStatus,
+            companions: target.companions,
+            message: target.message ?? '',
+          })
+          setParticipations(await safeReloadParticipations(selected.id))
           setSelected(await safeReloadEvent(selected.id, selected))
         }}
       />
@@ -294,7 +313,7 @@ function EventHomePage({
           <div className="relative space-y-4">
             <div>
               <p className="text-sm opacity-85">{profileName}님, 오늘 만들 수 있는 것</p>
-              <h2 className="text-4xl font-black leading-tight mt-1">행사 페이지,<br />공유 링크,<br />참석 응답</h2>
+              <h2 className="text-4xl font-black leading-tight mt-1">행사 페이지,<br />공유 링크,<br />참여 관리</h2>
             </div>
             <button onClick={() => onNavigate('/events/new')} className="w-full rounded-2xl py-4 font-black flex items-center justify-center gap-2" style={{ background: '#fffaf2', color: '#2f2923' }}>
               <Plus size={18} /> 행사 만들기
@@ -305,7 +324,7 @@ function EventHomePage({
         <section className="grid grid-cols-3 gap-2">
           <Metric icon={<Ticket size={15} />} label="초대장" value={events.length} />
           <Metric icon={<Home size={15} />} label="내 행사" value={myEvents.length} />
-          <Metric icon={<Users size={15} />} label="응답 관리" value="RSVP" />
+          <Metric icon={<Users size={15} />} label="신청 관리" value="승인" />
         </section>
 
         {myEvents.length > 0 && (
@@ -595,7 +614,7 @@ function EventCreatePage({ onBack, onCreated }: { onBack: () => void; onCreated:
           )}
         </FormBand>
 
-        <FormBand title="참석 응답 설정" icon={<Clipboard size={16} />}>
+        <FormBand title="참여와 승인 설정" icon={<Clipboard size={16} />}>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Field label="정원">
               <input inputMode="numeric" value={form.capacity} onChange={e => update('capacity', e.target.value.replace(/[^0-9]/g, ''))} style={lightInput} placeholder="예: 120" />
@@ -636,26 +655,31 @@ function EventCreatePage({ onBack, onCreated }: { onBack: () => void; onCreated:
 }
 
 function EventDetailPage({
-  event, rsvp, loadState, onBack, onNavigate, onRsvp,
+  event, participation, participations, viewerUserId, loadState, onBack, onNavigate, onApply, onHostUpdate,
 }: {
   event: EventRecord | null
-  rsvp: EventRsvp | null
+  participation: EventParticipation | null
+  participations: EventParticipation[]
+  viewerUserId?: string
   loadState: LoadState
   onBack: () => void
   onNavigate: (path: string) => void
-  onRsvp: (payload: { status: RsvpStatus; companions: number; message: string }) => Promise<void>
+  onApply: (payload: { applicationStatus?: ApplicationStatus; rsvpStatus?: RsvpStatus; companions: number; message: string; rsvpMessage?: string }) => Promise<void>
+  onHostUpdate: (target: EventParticipation, applicationStatus: ApplicationStatus) => Promise<void>
 }) {
-  const [status, setStatus] = useState<RsvpStatus>(rsvp?.status ?? 'attending')
-  const [companions, setCompanions] = useState(rsvp?.companions ?? 0)
-  const [message, setMessage] = useState(rsvp?.message ?? '')
+  const [status, setStatus] = useState<RsvpStatus>(participation?.rsvpStatus ?? 'attending')
+  const [companions, setCompanions] = useState(participation?.companions ?? 0)
+  const [message, setMessage] = useState(participation?.message ?? '')
+  const [rsvpMessage, setRsvpMessage] = useState(participation?.rsvpMessage ?? '')
   const [saving, setSaving] = useState(false)
   const [shareDone, setShareDone] = useState(false)
 
   useEffect(() => {
-    setStatus(rsvp?.status ?? 'attending')
-    setCompanions(rsvp?.companions ?? 0)
-    setMessage(rsvp?.message ?? '')
-  }, [rsvp])
+    setStatus(participation?.rsvpStatus ?? 'attending')
+    setCompanions(participation?.companions ?? 0)
+    setMessage(participation?.message ?? '')
+    setRsvpMessage(participation?.rsvpMessage ?? '')
+  }, [participation])
 
   if (loadState === 'loading') {
     return <CenteredState icon={<Loader2 size={24} className="animate-spin" />} title="초대장을 불러오는 중" />
@@ -672,10 +696,31 @@ function EventDetailPage({
   }
 
   const shareUrl = `${window.location.origin}/events/${event.id}`
+  const isHost = viewerUserId === event.hostUserId
+  const isConfirmed = participation?.applicationStatus === 'confirmed'
+  const submitApplication = async () => {
+    setSaving(true)
+    try {
+      await onApply({
+        applicationStatus: event.approvalMode === 'auto' ? 'confirmed' : 'pending',
+        companions,
+        message,
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const submitRsvp = async () => {
     setSaving(true)
     try {
-      await onRsvp({ status, companions, message })
+      await onApply({
+        applicationStatus: 'confirmed',
+        rsvpStatus: status,
+        companions,
+        message: participation?.message ?? message,
+        rsvpMessage,
+      })
     } finally {
       setSaving(false)
     }
@@ -759,34 +804,76 @@ function EventDetailPage({
           </InfoBand>
         )}
 
-        <InfoBand title="참석 여부 알려주세요" icon={<MessageCircle size={16} />}>
-          <div className="grid grid-cols-3 gap-2">
-            {([
-              ['attending', '참석'],
-              ['maybe', '고민 중'],
-              ['declined', '불참'],
-            ] as [RsvpStatus, string][]).map(([value, label]) => (
-              <button key={value} onClick={() => setStatus(value)} className="rounded-2xl py-3 text-sm font-black"
-                style={{ background: status === value ? '#302820' : '#fffaf2', color: status === value ? '#fffaf2' : '#302820', border: '1px solid #eadfcc' }}>
-                {label}
+        <InfoBand title={isHost ? '신청자 운영' : isConfirmed ? '참석 여부 재확인' : '참여 신청'} icon={<MessageCircle size={16} />}>
+          {isHost && (
+            <p className="text-sm leading-6" style={{ color: '#6f5c4a' }}>
+              주최자는 신청자 관리에서 참가 확정, 대기, 거절 상태를 처리합니다. 참석 여부 재확인은 참가 확정자에게만 열립니다.
+            </p>
+          )}
+
+          {!isHost && !participation && (
+            <>
+              <p className="text-sm leading-6" style={{ color: '#6f5c4a' }}>
+                공개 행사는 먼저 참여 신청을 보내고, 주최자가 신청자 목록을 확인한 뒤 참가 확정 또는 대기 상태로 안내합니다.
+              </p>
+              <div className="mt-3 grid grid-cols-[1fr_auto] gap-2 items-center">
+                <label className="text-sm font-bold" style={{ color: '#6f5c4a' }}>동반 인원</label>
+                <CompanionStepper value={companions} onChange={setCompanions} />
+              </div>
+              <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder="주최자에게 전할 신청 메시지" className="mt-3 w-full rounded-2xl p-4 text-sm" style={{ background: '#fffaf2', border: '1px solid #eadfcc', minHeight: 96, outline: 'none' }} />
+              <button onClick={submitApplication} disabled={saving} className="mt-3 w-full rounded-2xl py-4 font-black flex items-center justify-center gap-2" style={{ background: '#302820', color: '#fffaf2', opacity: saving ? 0.65 : 1 }}>
+                {saving ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
+                {event.approvalMode === 'auto' ? '참여 신청하고 바로 확정' : '참여 신청 보내기'}
               </button>
-            ))}
-          </div>
-          <div className="mt-3 grid grid-cols-[1fr_auto] gap-2 items-center">
-            <label className="text-sm font-bold" style={{ color: '#6f5c4a' }}>동반 인원</label>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setCompanions(v => Math.max(0, v - 1))} className="w-9 h-9 rounded-full font-black" style={{ background: '#fffaf2', border: '1px solid #eadfcc' }}>-</button>
-              <span className="w-8 text-center font-black">{companions}</span>
-              <button onClick={() => setCompanions(v => Math.min(10, v + 1))} className="w-9 h-9 rounded-full font-black" style={{ background: '#fffaf2', border: '1px solid #eadfcc' }}>+</button>
+            </>
+          )}
+
+          {!isHost && participation && !isConfirmed && (
+            <div className="rounded-2xl p-4" style={{ background: '#fffaf2', border: '1px solid #eadfcc' }}>
+              <p className="font-black">{applicationStatusLabel(participation.applicationStatus)}</p>
+              <p className="text-sm mt-2 leading-6" style={{ color: '#6f5c4a' }}>
+                {participation.applicationStatus === 'pending' && '주최자가 신청자 목록을 확인한 뒤 참가 확정 여부를 알려줄 예정입니다.'}
+                {participation.applicationStatus === 'waitlisted' && '현재는 대기자 명단에 있어요. 취소자가 생기면 추가 참석 가능 여부를 안내할 수 있습니다.'}
+                {participation.applicationStatus === 'rejected' && '이번 행사에는 아쉽게도 참여가 확정되지 않았습니다.'}
+                {participation.applicationStatus === 'cancelled' && '참여 신청이 취소된 상태입니다.'}
+              </p>
             </div>
-          </div>
-          <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder="축하 메시지나 전달할 말을 남겨주세요" className="mt-3 w-full rounded-2xl p-4 text-sm" style={{ background: '#fffaf2', border: '1px solid #eadfcc', minHeight: 96, outline: 'none' }} />
-          <button onClick={submitRsvp} disabled={saving} className="mt-3 w-full rounded-2xl py-4 font-black flex items-center justify-center gap-2" style={{ background: '#302820', color: '#fffaf2', opacity: saving ? 0.65 : 1 }}>
-            {saving ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
-            {rsvp ? '응답 수정하기' : '참석 응답 보내기'}
-          </button>
-          {rsvp && <p className="mt-3 text-center text-xs font-bold" style={{ color: '#16803a' }}>응답이 저장됐어요: {rsvpLabel(rsvp.status)}</p>}
+          )}
+
+          {!isHost && isConfirmed && (
+            <>
+              <p className="text-sm leading-6" style={{ color: '#6f5c4a' }}>
+                참가가 확정됐어요. 행사 7-10일 전 재확인 요청을 받으면 이 응답으로 최종 참석 여부를 알려주세요.
+              </p>
+              <div className="grid grid-cols-3 gap-2 mt-3">
+                {([
+                  ['attending', '참석'],
+                  ['maybe', '고민 중'],
+                  ['declined', '불참'],
+                ] as [RsvpStatus, string][]).map(([value, label]) => (
+                  <button key={value} onClick={() => setStatus(value)} className="rounded-2xl py-3 text-sm font-black"
+                    style={{ background: status === value ? '#302820' : '#fffaf2', color: status === value ? '#fffaf2' : '#302820', border: '1px solid #eadfcc' }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-3 grid grid-cols-[1fr_auto] gap-2 items-center">
+                <label className="text-sm font-bold" style={{ color: '#6f5c4a' }}>동반 인원</label>
+                <CompanionStepper value={companions} onChange={setCompanions} />
+              </div>
+              <textarea value={rsvpMessage} onChange={e => setRsvpMessage(e.target.value)} placeholder="최종 참석 관련 메모를 남겨주세요" className="mt-3 w-full rounded-2xl p-4 text-sm" style={{ background: '#fffaf2', border: '1px solid #eadfcc', minHeight: 96, outline: 'none' }} />
+              <button onClick={submitRsvp} disabled={saving} className="mt-3 w-full rounded-2xl py-4 font-black flex items-center justify-center gap-2" style={{ background: '#302820', color: '#fffaf2', opacity: saving ? 0.65 : 1 }}>
+                {saving ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
+                {participation.rsvpStatus ? '재확인 응답 수정하기' : '참석 여부 재확인 보내기'}
+              </button>
+              {participation.rsvpStatus && <p className="mt-3 text-center text-xs font-bold" style={{ color: '#16803a' }}>재확인 응답: {rsvpLabel(participation.rsvpStatus)}</p>}
+            </>
+          )}
         </InfoBand>
+
+        {isHost && (
+          <HostApplicantsPanel participations={participations} onUpdate={onHostUpdate} />
+        )}
 
         <InfoBand title="공유 링크" icon={<LinkIcon size={16} />}>
           <div className="flex gap-2">
@@ -835,10 +922,74 @@ function EventCard({ event, onClick }: { event: EventRecord; onClick: () => void
           <SmallPill icon={<MapPin size={12} />} label={event.venueName || eventTypeLabel(event.eventType)} />
         </div>
         {event.stats && (
-          <p className="text-xs font-bold mt-3" style={{ color: '#16803a' }}>{event.stats.attending}명 참석 예정</p>
+          <p className="text-xs font-bold mt-3" style={{ color: '#16803a' }}>{event.stats.confirmed}명 참가 확정 · {event.stats.pending}명 검토 중</p>
         )}
       </div>
     </button>
+  )
+}
+
+function CompanionStepper({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <button onClick={() => onChange(Math.max(0, value - 1))} className="w-9 h-9 rounded-full font-black" style={{ background: '#fffaf2', border: '1px solid #eadfcc' }}>-</button>
+      <span className="w-8 text-center font-black">{value}</span>
+      <button onClick={() => onChange(Math.min(10, value + 1))} className="w-9 h-9 rounded-full font-black" style={{ background: '#fffaf2', border: '1px solid #eadfcc' }}>+</button>
+    </div>
+  )
+}
+
+function HostApplicantsPanel({
+  participations,
+  onUpdate,
+}: {
+  participations: EventParticipation[]
+  onUpdate: (target: EventParticipation, applicationStatus: ApplicationStatus) => Promise<void>
+}) {
+  const sorted = [...participations].sort((a, b) => b.updatedAt - a.updatedAt)
+  return (
+    <InfoBand title="신청자 관리" icon={<Users size={16} />}>
+      <p className="text-sm leading-6 mb-3" style={{ color: '#6f5c4a' }}>
+        신청자를 확정하거나 대기자로 두면, 이후 참석 여부 재확인 응답을 받아 최종 인원을 조정할 수 있습니다.
+      </p>
+      {sorted.length === 0 ? (
+        <p className="text-sm rounded-2xl p-4 text-center" style={{ background: '#fffaf2', border: '1px solid #eadfcc', color: '#8d7a67' }}>아직 신청자가 없습니다</p>
+      ) : (
+        <div className="space-y-3">
+          {sorted.map(applicant => (
+            <div key={applicant.userId} className="rounded-2xl p-4" style={{ background: '#fffaf2', border: '1px solid #eadfcc' }}>
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center" style={{ background: '#f4eadc', color: '#6f5c4a' }}>
+                  {applicant.pictureUrl ? <img src={applicant.pictureUrl} alt="" className="w-full h-full object-cover" /> : applicant.displayName[0]}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-black">{applicant.displayName}</p>
+                    <span className="text-[11px] rounded-full px-2 py-1 font-bold" style={{ background: '#f4eadc', color: '#6f5c4a' }}>{applicationStatusLabel(applicant.applicationStatus)}</span>
+                    {applicant.rsvpStatus && <span className="text-[11px] rounded-full px-2 py-1 font-bold" style={{ background: '#e8f7ec', color: '#16803a' }}>재확인 {rsvpLabel(applicant.rsvpStatus)}</span>}
+                  </div>
+                  <p className="text-xs mt-1" style={{ color: '#8d7a67' }}>동반 {applicant.companions}명</p>
+                  {applicant.message && <p className="text-sm mt-2" style={{ color: '#4d4034' }}>{applicant.message}</p>}
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mt-3">
+                {([
+                  ['confirmed', '확정'],
+                  ['waitlisted', '대기'],
+                  ['rejected', '거절'],
+                ] as [ApplicationStatus, string][]).map(([status, label]) => (
+                  <button key={status} onClick={() => onUpdate(applicant, status)}
+                    className="rounded-2xl py-2 text-xs font-black"
+                    style={{ background: applicant.applicationStatus === status ? '#302820' : '#fbf8f2', color: applicant.applicationStatus === status ? '#fffaf2' : '#302820', border: '1px solid #eadfcc' }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </InfoBand>
   )
 }
 
@@ -986,29 +1137,46 @@ async function createEvent(payload: EventFormState & { hostUserId: string; hostN
   }
 }
 
-async function fetchRsvp(eventId: string, userId: string) {
-  if (useLocalEventStore()) return readLocalRsvp(eventId, userId)
-  const res = await fetch(`/api/events?action=rsvp&eventId=${encodeURIComponent(eventId)}&userId=${encodeURIComponent(userId)}`, { cache: 'no-store' })
+async function fetchParticipation(eventId: string, userId: string) {
+  if (useLocalEventStore()) return readLocalParticipation(eventId, userId)
+  const res = await fetch(`/api/events?action=participation&eventId=${encodeURIComponent(eventId)}&userId=${encodeURIComponent(userId)}`, { cache: 'no-store' })
   if (!res.ok) return null
-  const json = await res.json() as { rsvp: EventRsvp | null }
-  return json.rsvp
+  const json = await res.json() as { participation: EventParticipation | null }
+  return json.participation
 }
 
-async function saveRsvp(eventId: string, payload: { userId: string; displayName: string; pictureUrl?: string; status: RsvpStatus; companions: number; message: string }) {
+async function fetchParticipations(eventId: string) {
+  if (useLocalEventStore()) return readLocalParticipations(eventId)
+  const res = await fetch(`/api/events?action=participation&eventId=${encodeURIComponent(eventId)}`, { cache: 'no-store' })
+  if (!res.ok) return []
+  const json = await res.json() as { participations: EventParticipation[] }
+  return json.participations
+}
+
+async function saveParticipation(eventId: string, payload: {
+  userId: string
+  displayName: string
+  pictureUrl?: string
+  applicationStatus?: ApplicationStatus
+  rsvpStatus?: RsvpStatus
+  companions: number
+  message: string
+  rsvpMessage?: string
+}) {
   if (useLocalEventStore()) {
-    return writeLocalRsvp({ eventId, ...payload, createdAt: Date.now(), updatedAt: Date.now() })
+    return writeLocalParticipation({ eventId, ...payload, createdAt: Date.now(), updatedAt: Date.now() })
   }
   try {
     const res = await fetch('/api/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'rsvp', eventId, ...payload }),
+      body: JSON.stringify({ action: 'participation', eventId, ...payload }),
     })
-    if (!res.ok) throw new Error('rsvp failed')
-    const json = await res.json() as { rsvp: EventRsvp }
-    return json.rsvp
+    if (!res.ok) throw new Error('participation failed')
+    const json = await res.json() as { participation: EventParticipation }
+    return json.participation
   } catch {
-    return writeLocalRsvp({ eventId, ...payload, createdAt: Date.now(), updatedAt: Date.now() })
+    return writeLocalParticipation({ eventId, ...payload, createdAt: Date.now(), updatedAt: Date.now() })
   }
 }
 
@@ -1054,6 +1222,14 @@ async function safeReloadEvent(id: string, fallback: EventRecord) {
   }
 }
 
+async function safeReloadParticipations(id: string) {
+  try {
+    return await fetchParticipations(id)
+  } catch {
+    return readLocalParticipations(id)
+  }
+}
+
 function readLocalEvents() {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_EVENTS) || '[]') as EventRecord[]
@@ -1067,21 +1243,44 @@ function writeLocalEvent(event: EventRecord) {
   localStorage.setItem(STORAGE_EVENTS, JSON.stringify([event, ...events].slice(0, 50)))
 }
 
-function readLocalRsvps() {
+function readLocalParticipations(eventId?: string) {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_RSVPS) || '[]') as EventRsvp[]
+    const rows = JSON.parse(localStorage.getItem(STORAGE_RSVPS) || '[]') as EventParticipation[]
+    return eventId ? rows.filter(item => item.eventId === eventId) : rows
   } catch {
     return []
   }
 }
 
-function readLocalRsvp(eventId: string, userId: string) {
-  return readLocalRsvps().find(item => item.eventId === eventId && item.userId === userId) ?? null
+function readLocalParticipation(eventId: string, userId: string) {
+  return readLocalParticipations().find(item => item.eventId === eventId && item.userId === userId) ?? null
 }
 
-function writeLocalRsvp(rsvp: EventRsvp) {
-  const rows = readLocalRsvps().filter(item => !(item.eventId === rsvp.eventId && item.userId === rsvp.userId))
-  const next = { ...rsvp, updatedAt: Date.now() }
+function writeLocalParticipation(participation: Partial<EventParticipation> & {
+  eventId: string
+  userId: string
+  displayName: string
+  companions: number
+  message: string
+}) {
+  const rows = readLocalParticipations().filter(item => !(item.eventId === participation.eventId && item.userId === participation.userId))
+  const previous = readLocalParticipation(participation.eventId, participation.userId)
+  const now = Date.now()
+  const next: EventParticipation = {
+    eventId: participation.eventId,
+    userId: participation.userId,
+    displayName: participation.displayName,
+    pictureUrl: participation.pictureUrl,
+    applicationStatus: participation.applicationStatus ?? previous?.applicationStatus ?? 'pending',
+    rsvpStatus: participation.rsvpStatus ?? previous?.rsvpStatus,
+    companions: participation.companions,
+    message: participation.message || previous?.message,
+    rsvpMessage: participation.rsvpMessage ?? previous?.rsvpMessage,
+    createdAt: previous?.createdAt ?? participation.createdAt ?? now,
+    updatedAt: now,
+    decidedAt: participation.applicationStatus && participation.applicationStatus !== previous?.applicationStatus ? now : previous?.decidedAt,
+    rsvpUpdatedAt: participation.rsvpStatus ? now : previous?.rsvpUpdatedAt,
+  }
   localStorage.setItem(STORAGE_RSVPS, JSON.stringify([next, ...rows]))
   return next
 }
@@ -1105,12 +1304,15 @@ function readProfileSettings(profileName: string) {
 }
 
 function withLocalStats(event: EventRecord) {
-  const rows = readLocalRsvps().filter(item => item.eventId === event.id)
-  const stats = { attending: 0, maybe: 0, declined: 0, total: rows.length }
-  for (const rsvp of rows) {
-    if (rsvp.status === 'attending') stats.attending += 1 + rsvp.companions
-    if (rsvp.status === 'maybe') stats.maybe += 1 + rsvp.companions
-    if (rsvp.status === 'declined') stats.declined += 1
+  const rows = readLocalParticipations().filter(item => item.eventId === event.id)
+  const stats = { applied: rows.length, confirmed: 0, waitlisted: 0, pending: 0, rsvpAttending: 0, maybe: 0, declined: 0, total: rows.length }
+  for (const participation of rows) {
+    if (participation.applicationStatus === 'confirmed') stats.confirmed += 1
+    if (participation.applicationStatus === 'waitlisted') stats.waitlisted += 1
+    if (participation.applicationStatus === 'pending') stats.pending += 1
+    if (participation.rsvpStatus === 'attending') stats.rsvpAttending += 1 + participation.companions
+    if (participation.rsvpStatus === 'maybe') stats.maybe += 1 + participation.companions
+    if (participation.rsvpStatus === 'declined') stats.declined += 1
   }
   return { ...event, stats }
 }
@@ -1139,4 +1341,14 @@ function eventTypeLabel(value: string) {
 
 function rsvpLabel(value: RsvpStatus) {
   return ({ attending: '참석', maybe: '고민 중', declined: '불참' } as Record<RsvpStatus, string>)[value]
+}
+
+function applicationStatusLabel(value: ApplicationStatus) {
+  return ({
+    pending: '승인 대기',
+    confirmed: '참가 확정',
+    waitlisted: '대기자',
+    rejected: '참가 불가',
+    cancelled: '신청 취소',
+  } as Record<ApplicationStatus, string>)[value]
 }

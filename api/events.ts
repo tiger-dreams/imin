@@ -5,6 +5,7 @@ type EventVisibility = 'public' | 'private'
 type ApprovalMode = 'auto' | 'manual'
 type EventCategory = 'wedding' | 'party' | 'conference' | 'meetup'
 type RsvpStatus = 'attending' | 'maybe' | 'declined'
+type ApplicationStatus = 'pending' | 'confirmed' | 'waitlisted' | 'rejected' | 'cancelled'
 
 interface EventRecord {
   id: string
@@ -80,7 +81,7 @@ const optionalUrl = (value: unknown) => {
 
 const eventKey = (id: string) => `imin:event:${id}`
 const hostKey = (hostUserId: string) => `imin:events:host:${hostUserId}`
-const rsvpKey = (id: string) => `imin:event:${id}:rsvps`
+const participationKey = (id: string) => `imin:event:${id}:participations`
 
 function makeId(title: string) {
   const slug = title
@@ -102,13 +103,17 @@ async function readEvents(ids: string[]) {
 }
 
 async function statsFor(eventId: string) {
-  const rows = await cmd(['HVALS', rsvpKey(eventId)]) as string[] | null
-  const stats = { attending: 0, maybe: 0, declined: 0, total: 0 }
+  const rows = await cmd(['HVALS', participationKey(eventId)]) as string[] | null
+  const stats = { applied: 0, confirmed: 0, waitlisted: 0, pending: 0, rsvpAttending: 0, maybe: 0, declined: 0, total: 0 }
   for (const raw of rows ?? []) {
-    const rsvp = JSON.parse(raw) as { status?: string; companions?: number }
-    if (rsvp.status === 'attending') stats.attending += 1 + Math.max(0, rsvp.companions ?? 0)
-    if (rsvp.status === 'maybe') stats.maybe += 1 + Math.max(0, rsvp.companions ?? 0)
-    if (rsvp.status === 'declined') stats.declined += 1
+    const participation = JSON.parse(raw) as { applicationStatus?: string; rsvpStatus?: string; companions?: number }
+    stats.applied += 1
+    if (participation.applicationStatus === 'confirmed') stats.confirmed += 1
+    if (participation.applicationStatus === 'waitlisted') stats.waitlisted += 1
+    if (participation.applicationStatus === 'pending') stats.pending += 1
+    if (participation.rsvpStatus === 'attending') stats.rsvpAttending += 1 + Math.max(0, participation.companions ?? 0)
+    if (participation.rsvpStatus === 'maybe') stats.maybe += 1 + Math.max(0, participation.companions ?? 0)
+    if (participation.rsvpStatus === 'declined') stats.declined += 1
     stats.total += 1
   }
   return stats
@@ -129,16 +134,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const eventId = text(req.query.eventId)
     const userId = text(req.query.userId)
 
-    if (action === 'rsvp') {
+    if (action === 'participation' || action === 'rsvp') {
       if (!eventId) return res.status(400).json({ error: 'eventId required' })
 
       if (userId) {
-        const raw = await cmd(['HGET', rsvpKey(eventId), userId]) as string | null
-        return res.status(200).json({ rsvp: raw ? JSON.parse(raw) : null })
+        const raw = await cmd(['HGET', participationKey(eventId), userId]) as string | null
+        return res.status(200).json({ participation: raw ? JSON.parse(raw) : null, rsvp: raw ? JSON.parse(raw) : null })
       }
 
-      const rows = await cmd(['HVALS', rsvpKey(eventId)]) as string[] | null
-      return res.status(200).json({ rsvps: (rows ?? []).map(row => JSON.parse(row)) })
+      const rows = await cmd(['HVALS', participationKey(eventId)]) as string[] | null
+      const participations = (rows ?? []).map(row => JSON.parse(row))
+      return res.status(200).json({ participations, rsvps: participations })
     }
 
     if (id) {
@@ -160,7 +166,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'POST') {
     const body = req.body as Record<string, unknown>
-    if (body.action === 'rsvp') {
+    if (body.action === 'participation' || body.action === 'rsvp') {
       const id = text(body.eventId)
       const uid = text(body.userId)
       if (!id) return res.status(400).json({ error: 'eventId required' })
@@ -169,23 +175,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const eventExists = await cmd(['EXISTS', eventKey(id)]) as number
       if (!eventExists) return res.status(404).json({ error: 'Event not found' })
 
-      const previousRaw = await cmd(['HGET', rsvpKey(id), uid]) as string | null
-      const previous = previousRaw ? JSON.parse(previousRaw) as { createdAt?: number } : null
+      const previousRaw = await cmd(['HGET', participationKey(id), uid]) as string | null
+      const previous = previousRaw ? JSON.parse(previousRaw) as {
+        createdAt?: number
+        applicationStatus?: ApplicationStatus
+        rsvpStatus?: RsvpStatus
+        companions?: number
+        message?: string
+        rsvpMessage?: string
+        decidedAt?: number
+        rsvpUpdatedAt?: number
+      } : null
       const now = Date.now()
-      const rsvp = {
+      const nextApplicationStatus = oneOf(
+        body.applicationStatus,
+        ['pending', 'confirmed', 'waitlisted', 'rejected', 'cancelled'] as const,
+        previous?.applicationStatus ?? 'pending'
+      ) as ApplicationStatus
+      const rsvpStatus = body.rsvpStatus
+        ? oneOf(body.rsvpStatus, ['attending', 'maybe', 'declined'] as const, 'attending') as RsvpStatus
+        : previous?.rsvpStatus
+      const participation = {
         eventId: id,
         userId: uid,
         displayName: text(body.displayName, '참석자').slice(0, 80),
         pictureUrl: text(body.pictureUrl).slice(0, 500) || undefined,
-        status: oneOf(body.status, ['attending', 'maybe', 'declined'] as const, 'attending') as RsvpStatus,
-        companions: Math.max(0, Math.min(10, Math.floor(Number(body.companions) || 0))),
-        message: text(body.message).slice(0, 500) || undefined,
+        applicationStatus: nextApplicationStatus,
+        rsvpStatus,
+        companions: body.companions === undefined ? previous?.companions ?? 0 : Math.max(0, Math.min(10, Math.floor(Number(body.companions) || 0))),
+        message: text(body.message).slice(0, 500) || previous?.message || undefined,
+        rsvpMessage: text(body.rsvpMessage).slice(0, 500) || previous?.rsvpMessage || undefined,
         createdAt: previous?.createdAt ?? now,
         updatedAt: now,
+        decidedAt: nextApplicationStatus !== previous?.applicationStatus ? now : previous?.decidedAt,
+        rsvpUpdatedAt: body.rsvpStatus ? now : previous?.rsvpUpdatedAt,
       }
 
-      await cmd(['HSET', rsvpKey(id), uid, JSON.stringify(rsvp)])
-      return res.status(200).json({ ok: true, rsvp })
+      await cmd(['HSET', participationKey(id), uid, JSON.stringify(participation)])
+      return res.status(200).json({ ok: true, participation, rsvp: participation })
     }
 
     const title = text(body.title).slice(0, 120)
@@ -203,7 +230,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       id: makeId(title),
       title,
       description: text(body.description).slice(0, 1200),
-      category: oneOf(body.category, ['wedding', 'party', 'conference', 'meetup'] as const, 'wedding'),
+      category: oneOf(body.category, ['wedding', 'party', 'conference', 'meetup'] as const, 'meetup'),
       coverImageUrl: optionalUrl(body.coverImageUrl),
       hostUserId,
       hostName,

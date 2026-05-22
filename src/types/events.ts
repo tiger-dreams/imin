@@ -2,6 +2,7 @@ export type EventType = 'offline' | 'online' | 'hybrid'
 export type EventVisibility = 'public' | 'private'
 export type ApprovalMode = 'auto' | 'manual'
 export type RsvpStatus = 'attending' | 'maybe' | 'declined'
+export type ApplicationStatus = 'pending' | 'confirmed' | 'waitlisted' | 'rejected' | 'cancelled'
 export type EventCategory = 'wedding' | 'party' | 'conference' | 'meetup'
 
 export interface EventRecord {
@@ -34,22 +35,30 @@ export interface EventRecord {
 }
 
 export interface EventStats {
-  attending: number
+  applied: number
+  confirmed: number
+  waitlisted: number
+  pending: number
+  rsvpAttending: number
   maybe: number
   declined: number
   total: number
 }
 
-export interface EventRsvp {
+export interface EventParticipation {
   eventId: string
   userId: string
   displayName: string
   pictureUrl?: string
-  status: RsvpStatus
+  applicationStatus: ApplicationStatus
+  rsvpStatus?: RsvpStatus
   companions: number
   message?: string
+  rsvpMessage?: string
   createdAt: number
   updatedAt: number
+  decidedAt?: number
+  rsvpUpdatedAt?: number
 }
 
 export interface EventFormState {
