@@ -76,7 +76,7 @@ git diff --check
 Pass
 
 npm run build
-Pass. Vite build completed; non-blocking warnings for eruda eval and chunk size.
+Pass. Vite build completed after removing the `eruda` debug console; the previous eval warning and extra debug chunk are gone.
 
 npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution bundler --skipLibCheck --types node api/events.ts
 Pass
