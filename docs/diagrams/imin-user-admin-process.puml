@@ -1,0 +1,99 @@
+@startuml
+title imin Target User Admin Process
+
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+  BackgroundColor #FFF8EF
+  BorderColor #B98B61
+  FontColor #302820
+}
+skinparam note {
+  BackgroundColor #F6EADB
+  BorderColor #D6B995
+}
+
+|Host|
+start
+:Create event invitation;
+:Set visibility, capacity, approval mode;
+:Set application questions and reconfirmation timing;
+
+|Guest|
+:Open shared event page;
+:Review event details;
+:Complete profile snapshot;
+:Submit participation application;
+
+|System|
+:Store application as pending;
+:Notify host of new applicant;
+
+|Host|
+:Open event manage view;
+:Filter/search/sort applicants;
+:Review profile, answers, companions, message;
+
+if (Applicant fits event?) then (yes)
+  :Confirm applicant;
+  |System|
+  :Record approval history;
+  :Send confirmation notice with event link;
+  :Generate participant QR/check-in token;
+elseif (Keep for later?) then (waitlist)
+  |Host|
+  :Move applicant to waitlist;
+  |System|
+  :Record waitlist history;
+  :Send waitlist notice;
+else (no)
+  |Host|
+  :Reject applicant;
+  |System|
+  :Record rejection history;
+  :Send rejection notice when enabled;
+endif
+
+|Guest|
+if (Status is confirmed?) then (confirmed)
+  :See confirmed state;
+  :Receive reconfirmation request 7-10 days before event;
+  :Submit RSVP reconfirmation;
+else (pending or waitlisted)
+  :See current application state;
+  :Wait for host decision or capacity change;
+endif
+
+|System|
+:Update RSVP / application stats;
+
+|Host|
+:Monitor confirmed, waitlisted, RSVP missing, declined;
+
+if (Confirmed participant declines or capacity opens?) then (yes)
+  :Promote waitlisted applicant;
+  |System|
+  :Record promotion history;
+  :Send additional confirmation notice;
+else (no)
+  :Keep current roster;
+endif
+
+|Event Staff|
+:Open day-of-event check-in view;
+:Scan participant QR or search roster;
+
+|System|
+:Mark arrived / checked-in / no-show;
+:Update live attendance counts;
+
+|Host|
+:Export applicants, RSVP, and check-in data;
+:Review attendance and follow-up segments;
+
+stop
+
+legend right
+  Target process, not current implementation.
+  Keep implementation within existing API/function budget.
+endlegend
+@enduml

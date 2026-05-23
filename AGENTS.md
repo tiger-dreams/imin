@@ -4,7 +4,7 @@ This file provides guidance to Codex when working in this repository.
 
 ## Project Overview
 
-`imin` is a LINE LIFF event check-in and live raffle app for Tech Week Hackathon-style onsite events. It verifies attendance with LINE login, GeoIP, browser GPS, and realtime presence, then supports admin-run raffles and event wall messaging.
+`imin` is a LINE LIFF event operations tool. It started as a Tech Week Hackathon-style onsite check-in and live raffle app, and is evolving into a mobile invitation, participation approval, RSVP reconfirmation, presence verification, and live raffle platform for meetups, internal events, webinars, and hybrid events.
 
 ## Development Commands
 
@@ -61,8 +61,10 @@ Before declaring GSD done for a release, production fix, or push:
    - Record the observed pattern and the project decision in the QA log.
    - Skip benchmarking for narrow bug fixes, copy edits, dependency chores, or user-specified designs.
 3. Update release notes or visible docs when the change is user-facing.
-   - If the project later gains a changelog, update it for every user-facing release.
-   - Until then, record user-facing changes in the QA log and update `README.md` when usage, routes, setup, or operations change.
+   - Update `/release-notes` content for every user-facing GSD release.
+   - Update `README.md` when usage, routes, setup, or operations change.
+   - For meaningful product-facing capabilities, add or update `/blog` content through a Product Marketing Manager lens: explain how hosts should use the feature, when not to use it, and what operational problem it solves.
+   - Record user-facing release notes in the QA log.
 4. Run QA and save the result.
    - Use `docs/release/agent_qa_template.md`.
    - Save the log as `docs/release/agent_qa-YYYY-MM-DD-<scope>.md` or `docs/release/agent_qa-YYYY-MM-DD-vX.Y.Z.md`.
@@ -94,6 +96,8 @@ Before declaring GSD done for a release, production fix, or push:
 - `src/pages/AdminPage.tsx`: Raffle administration.
 - `src/pages/AdminWallPage.tsx`: Event wall administration.
 - `src/pages/WallPage.tsx`: Public wall display.
+- `src/pages/ReleaseNotesPage.tsx`: Public release notes for user-facing GSD changes.
+- `src/pages/BlogPage.tsx`: Public product marketing article surface.
 - `src/hooks/useHeartbeat.ts`: Presence TTL refresh.
 - `api/*.ts`: Vercel serverless functions for check-in, presence, raffle state, notification, wall messages, and LINE webhook.
 

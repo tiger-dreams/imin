@@ -24,8 +24,9 @@ Do not call a release task done until it is release-ready. Do not push unless th
    - Summarize the common pattern, notable exceptions, and the decision this project will adopt.
    - Record the benchmark summary in the QA log or a dedicated note when it materially affects implementation.
 3. Update release notes or visible docs.
-   - If the project later gains a changelog, update it for every user-facing release.
-   - Until then, update `README.md` when behavior, routes, setup, operations, or environment variables change.
+   - Update `/release-notes` for every user-facing GSD release so users can see what changed in the web app.
+   - Update `README.md` when behavior, routes, setup, operations, or environment variables change.
+   - For meaningful product-facing capabilities, add or update `/blog` content through a Product Marketing Manager lens: explain use cases, target hosts, when to use the feature, and when existing tools are enough.
    - Record user-facing release notes in the QA log.
 4. Run QA and save the result.
    - Use `docs/release/agent_qa_template.md`.
@@ -42,7 +43,8 @@ Do not call a release task done until it is release-ready. Do not push unless th
    - `find api -maxdepth 1 -type f -name '*.ts' | wc -l` and confirm the count is 12 or fewer for Vercel Hobby.
    - `node --check` for changed JavaScript files when applicable
    - API smoke checks for changed Vercel functions when feasible
-   - Browser checks for changed routes, including `/`, `/admin`, `/admin/raffle`, `/admin/wall`, and `/wall` when relevant
+    - Browser checks for changed routes, including `/`, `/admin`, `/admin/raffle`, `/admin/wall`, and `/wall` when relevant
+    - Browser checks for `/release-notes` and `/blog` when release notes or PMM content changes
 7. Resolve all blocking QA failures and review findings before declaring GSD done or pushing.
 8. Save the final review log as `docs/release/agent_codereview-YYYY-MM-DD-<scope>.md` or `docs/release/agent_codereview-YYYY-MM-DD-vX.Y.Z.md`.
 

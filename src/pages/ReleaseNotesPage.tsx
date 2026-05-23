@@ -12,6 +12,23 @@ interface ReleaseNote {
 const RELEASES: ReleaseNote[] = [
   {
     date: '2026-05-24',
+    title: 'GSD 릴리즈 노트와 블로그 운영',
+    summary: 'GSD로 추가된 기능을 웹에서 확인할 수 있게 하고, PMM 관점의 활용 아티클과 AI 개발 아키텍처 문서를 추가했습니다.',
+    highlights: [
+      '/release-notes 별칭 라우트 추가',
+      '/blog 공개 활용 아티클 추가',
+      'AI 개발 아키텍처와 제품 브리프 문서 추가',
+      'GSD 지침에 릴리즈 노트와 PMM 블로그 업데이트 기준 추가',
+      '승인형 기술 밋업 샘플 행사 추가',
+    ],
+    checks: ['npm run build', 'git diff --check', 'Playwright /release-notes·/blog QA', 'API 함수 수 12개 유지'],
+    links: [
+      { label: '블로그', href: '/blog' },
+      { label: 'QA 로그', href: 'https://github.com/tiger-dreams/imin/blob/main/docs/release/agent_qa-2026-05-24-gsd-release-notes-blog.md' },
+    ],
+  },
+  {
+    date: '2026-05-24',
     title: '행사형 체크인 UX 통합',
     summary: '레거시 체크인 화면을 행사 플랫폼 테마와 실제 사용자 흐름에 맞춰 재정리했습니다.',
     highlights: [
@@ -123,10 +140,13 @@ export default function ReleaseNotesPage() {
         >
           <ArrowLeft size={18} />
         </button>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-xs font-black" style={{ color: '#9b7654' }}>imin</p>
           <h1 className="text-lg font-black leading-tight">릴리즈 내역</h1>
         </div>
+        <a href="/blog" className="rounded-full px-3 py-2 text-xs font-black" style={{ background: '#302820', color: '#fffaf2', textDecoration: 'none' }}>
+          Blog
+        </a>
       </header>
 
       <main className="px-4 py-5 space-y-4 max-w-3xl mx-auto">
