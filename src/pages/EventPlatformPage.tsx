@@ -964,14 +964,14 @@ function EventDetailPage({
 
 function CreatePreview({ form, hostName }: { form: EventFormState; hostName: string }) {
   return (
-    <section className="relative overflow-hidden rounded-[28px] min-h-[300px] flex items-end p-5" style={{ background: '#302820', color: '#fffaf2' }}>
+    <section className="relative overflow-hidden rounded-3xl min-h-[168px] sm:min-h-[190px] flex items-end p-4" style={{ background: '#302820', color: '#fffaf2' }}>
       {form.coverImageUrl ? <img src={form.coverImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-70" /> : <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, #b99678, #f6ead8 55%, #7c5b43)' }} />}
       <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent, rgba(48,40,32,0.84))' }} />
-      <div className="relative">
+      <div className="relative min-w-0">
         <p className="text-xs font-bold opacity-80">{categoryLabel(form.category)}</p>
-        <h2 className="text-4xl font-black leading-none mt-2">{form.title || '행사 제목'}</h2>
-        <p className="text-sm mt-3 opacity-85">{[hostName, form.coHostName].filter(Boolean).join(' & ')}</p>
-        {form.startsAt && <p className="text-sm mt-4">{formatDate(form.startsAt)}</p>}
+        <h2 className="text-2xl sm:text-3xl font-black leading-tight mt-1 line-clamp-2 break-words">{form.title || '행사 제목'}</h2>
+        <p className="text-xs sm:text-sm mt-2 opacity-85 truncate">{[hostName, form.coHostName].filter(Boolean).join(' & ')}</p>
+        {form.startsAt && <p className="text-xs sm:text-sm mt-2">{formatDate(form.startsAt)}</p>}
       </div>
     </section>
   )
