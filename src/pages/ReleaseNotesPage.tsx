@@ -12,6 +12,21 @@ interface ReleaseNote {
 const RELEASES: ReleaseNote[] = [
   {
     date: '2026-05-24',
+    title: '오늘 데모 행사 체크인 흐름',
+    summary: '홈의 레거시 단일 체크인 링크를 숨기고, 매일 오늘 날짜로 갱신되는 샘플 행사 상세에서 체크인을 시작하도록 데모 흐름을 정리했습니다.',
+    highlights: [
+      '샘플 행사 `오늘의 imin 데모 체크인` 날짜를 매일 오늘 13:00-18:00으로 자동 갱신',
+      '홈 화면의 `기존 현장 체크인 열기` 링크 제거',
+      '오프라인/하이브리드 행사 상세에 `현장 체크인` CTA 추가',
+      '참여 확정 전에는 체크인 CTA 비활성화, 자동 승인 후 활성화',
+    ],
+    checks: ['npm run build', 'git diff --check', 'Playwright 모바일 데모 체크인 QA'],
+    links: [
+      { label: 'QA 로그', href: 'https://github.com/tiger-dreams/imin/blob/main/docs/release/agent_qa-2026-05-24-daily-demo-checkin.md' },
+    ],
+  },
+  {
+    date: '2026-05-24',
     title: '추첨 히스토리 관리 강화',
     summary: '운영자가 과거 추첨 결과를 더 쉽게 보관, 재사용, 정리할 수 있도록 히스토리 관리 도구를 확장했습니다.',
     highlights: [

@@ -90,30 +90,36 @@ const PRESET_KEYS: (keyof EventFormState)[] = [
   'onlineUrl', 'capacity', 'dressCode', 'giftNote', 'contactNote',
 ]
 
+const todayAt = (hour: number, minute = 0) => {
+  const d = new Date()
+  d.setHours(hour, minute, 0, 0)
+  return toLocalInputDateTime(d)
+}
+
 const SAMPLE_EVENTS: EventRecord[] = [
   {
-    id: 'sample-meetup',
-    title: '토요일 커뮤니티 밋업',
-    description: '관심사가 비슷한 사람들이 모여 가볍게 이야기하고 연결되는 시간입니다.',
+    id: 'sample-daily-checkin',
+    title: '오늘의 imin 데모 체크인',
+    description: '오늘 현장에서 바로 참여 신청하고 체크인까지 확인하는 데모 행사입니다.',
     category: 'meetup',
     coverImageUrl: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=1400&q=80',
     hostUserId: 'sample-host',
     hostName: 'imin team',
-    startsAt: '2026-06-20T13:00',
-    endsAt: '2026-06-20T15:00',
+    startsAt: todayAt(13),
+    endsAt: todayAt(18),
     timezone: 'Asia/Seoul',
     eventType: 'offline',
-    venueName: '커뮤니티 라운지',
-    address: '서울특별시 마포구 동교로 25길',
+    venueName: 'Hackday 데모 라운지',
+    address: '오늘 행사장',
     capacity: 30,
     visibility: 'public',
     approvalMode: 'auto',
-    dressCode: '편한 복장',
-    giftNote: '간단한 다과가 준비됩니다.',
-    contactNote: '자리가 좁아 동반 인원이 있으면 미리 알려주세요.',
-    createdAt: Date.now() - 86400000,
-    updatedAt: Date.now() - 86400000,
-    stats: { applied: 25, confirmed: 18, waitlisted: 4, pending: 3, rsvpAttending: 0, maybe: 0, declined: 0, total: 25 },
+    dressCode: '현장 데모 확인용',
+    giftNote: '체크인 후 추첨과 메시지 월 데모를 이어서 볼 수 있습니다.',
+    contactNote: '홈에서는 레거시 체크인 링크를 숨기고, 이 행사 상세에서 체크인을 시작합니다.',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    stats: { applied: 12, confirmed: 12, waitlisted: 0, pending: 0, rsvpAttending: 0, maybe: 0, declined: 0, total: 12 },
   },
 ]
 
@@ -337,20 +343,6 @@ function EventHomePage({
         <EventSection title="공개 행사" action={loadState === 'loading' ? '불러오는 중' : '새로고침'} onAction={onRefresh}>
           {(events.length ? events : SAMPLE_EVENTS).map(event => <EventCard key={event.id} event={event} onClick={() => onNavigate(`/events/${event.id}`)} />)}
         </EventSection>
-
-        <button onClick={() => {
-          window.history.pushState({}, '', '/checkin')
-          window.dispatchEvent(new PopStateEvent('popstate'))
-        }} className="w-full rounded-2xl p-4 text-left flex items-center gap-3" style={{ background: '#fffaf2', border: '1px solid #eadfcc' }}>
-          <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: '#e8f7ec', color: '#16803a' }}>
-            <CheckCircle size={18} />
-          </div>
-          <div className="flex-1">
-            <p className="font-bold">기존 현장 체크인 열기</p>
-            <p className="text-xs" style={{ color: '#8d7a67' }}>Tech Week 단일 행사 플로우는 그대로 유지됩니다</p>
-          </div>
-          <ExternalLink size={16} style={{ color: '#8d7a67' }} />
-        </button>
 
         <a href="/release" className="w-full rounded-2xl p-4 text-left flex items-center gap-3" style={{ background: '#fffaf2', border: '1px solid #eadfcc', textDecoration: 'none', color: 'inherit' }}>
           <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: '#f4eadc', color: '#7a5b3d' }}>
@@ -710,6 +702,7 @@ function EventDetailPage({
   const shareUrl = `${window.location.origin}/events/${event.id}`
   const isHost = viewerUserId === event.hostUserId
   const isConfirmed = participation?.applicationStatus === 'confirmed'
+  const canCheckIn = event.eventType !== 'online' && (isHost || isConfirmed)
   const canEnterOnline = !!event.onlineUrl && (isHost || isConfirmed)
   const entryState = resolveOnlineEntryState(event)
   const submitApplication = async () => {
@@ -772,6 +765,12 @@ function EventDetailPage({
       })
     }
     window.open(event.onlineUrl, '_blank', 'noopener,noreferrer')
+  }
+
+  const openCheckIn = () => {
+    if (!canCheckIn) return
+    window.history.pushState({}, '', '/checkin')
+    window.dispatchEvent(new PopStateEvent('popstate'))
   }
 
   return (
@@ -841,6 +840,25 @@ function EventDetailPage({
             </div>
           )}
         </InfoBand>
+
+        {event.eventType !== 'online' && (
+          <InfoBand title="현장 체크인" icon={<CheckCircle size={16} />}>
+            <p className="text-sm leading-6" style={{ color: '#6f5c4a' }}>
+              {canCheckIn
+                ? '행사장에 도착했다면 위치 확인을 거쳐 체크인하고, 추첨과 현장 기능에 참여할 수 있습니다.'
+                : '참여 신청이 확정되면 현장 체크인을 시작할 수 있습니다.'}
+            </p>
+            <button
+              onClick={openCheckIn}
+              disabled={!canCheckIn}
+              className="mt-3 w-full rounded-2xl py-4 font-black flex items-center justify-center gap-2"
+              style={{ background: canCheckIn ? '#302820' : '#eadfcc', color: canCheckIn ? '#fffaf2' : '#8d7a67' }}
+            >
+              <CheckCircle size={17} />
+              {canCheckIn ? '현장 체크인 시작' : '참여 확정 후 체크인 가능'}
+            </button>
+          </InfoBand>
+        )}
 
         {(event.dressCode || event.giftNote || event.contactNote) && (
           <InfoBand title="안내" icon={<Gift size={16} />}>
@@ -1375,6 +1393,11 @@ function withLocalStats(event: EventRecord) {
 
 function slugify(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9가-힣]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'event'
+}
+
+function toLocalInputDateTime(date: Date) {
+  const offsetMs = date.getTimezoneOffset() * 60_000
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16)
 }
 
 async function shareWithLineTargetPicker(event: EventRecord, shareUrl: string) {
