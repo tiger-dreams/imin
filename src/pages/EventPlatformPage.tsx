@@ -556,7 +556,7 @@ function EventCreatePage({ onBack, onCreated }: { onBack: () => void; onCreated:
 
         <FormBand title="기본 정보" icon={<Heart size={16} />}>
           <Field label="행사 유형">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 min-w-0">
               {[
                 ['meetup', '밋업'],
                 ['conference', '컨퍼런스'],
@@ -586,7 +586,7 @@ function EventCreatePage({ onBack, onCreated }: { onBack: () => void; onCreated:
         </FormBand>
 
         <FormBand title="일정과 장소" icon={<CalendarDays size={16} />}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
             <Field label="시작">
               <input type="datetime-local" value={form.startsAt} onChange={e => update('startsAt', e.target.value)} style={lightInput} />
             </Field>
@@ -595,14 +595,14 @@ function EventCreatePage({ onBack, onCreated }: { onBack: () => void; onCreated:
             </Field>
           </div>
           <Field label="진행 방식">
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2 min-w-0">
               {([
                 ['offline', '오프라인'],
                 ['online', '온라인'],
                 ['hybrid', '하이브리드'],
               ] as [EventType, string][]).map(([value, label]) => (
                 <button key={value} onClick={() => update('eventType', value)}
-                  className="rounded-2xl py-3 text-xs font-bold"
+                  className="rounded-2xl px-1 py-3 text-xs font-bold min-w-0"
                   style={{ background: form.eventType === value ? '#725034' : '#fff', color: form.eventType === value ? '#fffaf2' : '#302820', border: '1px solid #eadfcc' }}>
                   {label}
                 </button>
@@ -627,7 +627,7 @@ function EventCreatePage({ onBack, onCreated }: { onBack: () => void; onCreated:
         </FormBand>
 
         <FormBand title="참여와 승인 설정" icon={<Clipboard size={16} />}>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 min-w-0">
             <Field label="정원">
               <input inputMode="numeric" value={form.capacity} onChange={e => update('capacity', e.target.value.replace(/[^0-9]/g, ''))} style={lightInput} placeholder="예: 120" />
             </Field>
@@ -1063,7 +1063,7 @@ function EventSection({ title, action, onAction, children }: { title: string; ac
 
 function FormBand({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="rounded-3xl p-4 space-y-4" style={{ background: '#fffaf2', border: '1px solid #eadfcc' }}>
+    <section className="rounded-3xl p-4 space-y-4 min-w-0 overflow-hidden" style={{ background: '#fffaf2', border: '1px solid #eadfcc' }}>
       <h2 className="font-black flex items-center gap-2" style={{ color: '#302820' }}>{icon}{title}</h2>
       {children}
     </section>
@@ -1072,7 +1072,7 @@ function FormBand({ title, icon, children }: { title: string; icon: React.ReactN
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block">
+    <label className="block min-w-0">
       <span className="block text-xs font-black mb-2" style={{ color: '#8d6e52' }}>{label}</span>
       {children}
     </label>
@@ -1120,7 +1120,13 @@ function CenteredState({ icon, title, action }: { icon: React.ReactNode; title: 
 }
 
 const lightInput: React.CSSProperties = {
+  boxSizing: 'border-box',
+  display: 'block',
   width: '100%',
+  maxWidth: '100%',
+  minWidth: 0,
+  WebkitAppearance: 'none',
+  appearance: 'none',
   borderRadius: 16,
   border: '1px solid #eadfcc',
   background: '#fbf8f2',
