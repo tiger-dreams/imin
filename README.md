@@ -35,6 +35,7 @@ LINE 로그인 (LIFF)
 | Presence Score | 체크인 40pt + GeoIP 20pt + GPS 20pt |
 | 활성 세션 추첨 | Upstash Redis로 실시간 접속자 추적, 폴링 기반 참여자 뷰 |
 | 당첨 확인 (imin!) | 당첨 후 15초 이내 버튼 클릭 필수, 미응답 시 Reroll |
+| 추첨 히스토리 관리 | 과거 추첨 결과 상세, CSV 내보내기, 전체 초기화, 이전 설정 재사용 |
 | Admin 대시보드 | `/admin` — 추첨 설정, 지역 필터, 결과 관리 (PC Web) |
 | LINE OA Webhook | 친구 추가 시 웰컴 Flex Message 자동 발송 |
 

@@ -12,6 +12,22 @@ interface ReleaseNote {
 const RELEASES: ReleaseNote[] = [
   {
     date: '2026-05-24',
+    title: '추첨 히스토리 관리 강화',
+    summary: '운영자가 과거 추첨 결과를 더 쉽게 보관, 재사용, 정리할 수 있도록 히스토리 관리 도구를 확장했습니다.',
+    highlights: [
+      '추첨 기록 CSV 내보내기',
+      '추첨 기록 전체 초기화',
+      '과거 추첨의 상품/방식/인원/지역 설정 다시 불러오기',
+      '기록 상세에 풀 인원, 확인율, 지역 필터 요약 표시',
+    ],
+    checks: ['npm run build', 'git diff --check', 'Playwright Admin 히스토리 QA', 'API 함수 수 12개 유지'],
+    links: [
+      { label: 'Issue #2', href: 'https://github.com/tiger-dreams/imin/issues/2' },
+      { label: 'QA 로그', href: 'https://github.com/tiger-dreams/imin/blob/main/docs/release/agent_qa-2026-05-24-raffle-history-management.md' },
+    ],
+  },
+  {
+    date: '2026-05-24',
     title: '릴리즈 내역 페이지',
     summary: '앱 안에서 최근 GSD 작업, 검증 결과, 관련 이슈와 QA 로그를 확인할 수 있는 공개 페이지를 추가했습니다.',
     highlights: [

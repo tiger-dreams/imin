@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Trophy, Users, RefreshCw, Play, RotateCcw, Gift, Dices, Star, Drama, SpellCheck2,
   MapPin, CheckCircle, XCircle, RefreshCcw, History, ChevronDown, ChevronUp, Send, Mic,
-  ImagePlus, X, Loader2, Megaphone, Radio,
+  ImagePlus, X, Loader2, Megaphone, Radio, Download, Trash2, ClipboardCopy,
 } from 'lucide-react'
 
 interface ActiveUser {
@@ -122,6 +122,54 @@ export default function AdminPage() {
     const res = await fetch('/api/raffle-history')
     if (res.ok) setHistory(((await res.json()) as { history: HistoryEntry[] }).history)
   }, [])
+
+  const clearHistory = async () => {
+    if (history.length === 0) return
+    if (!window.confirm('추첨 기록을 모두 삭제할까요?')) return
+    const res = await fetch('/api/raffle-history', { method: 'DELETE' })
+    if (res.ok) setHistory([])
+  }
+
+  const exportHistoryCsv = () => {
+    if (history.length === 0) return
+    const headers = ['savedAt', 'prize', 'method', 'count', 'confirmed', 'pool', 'allowedCities', 'winners']
+    const rows = history.map(entry => [
+      new Date(entry.savedAt).toISOString(),
+      entry.prize,
+      entry.method,
+      String(entry.count),
+      `${entry.winners.filter(w => w.confirmed).length}/${entry.winners.length}`,
+      String(entry.pool.length),
+      (entry.allowedCities ?? []).join('|') || 'all',
+      entry.winners.map(w => `${w.displayName}${w.confirmed ? '(confirmed)' : '(pending)'}`).join('|'),
+    ])
+    const csv = [headers, ...rows].map(row => row.map(csvCell).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `imin-raffle-history-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const reuseHistory = (entry: HistoryEntry) => {
+    setForm({
+      prize: entry.prize,
+      prizeImageUrl: entry.prizeImageUrl,
+      prizeImages: entry.prizeImages ?? [],
+      giftMode: entry.giftMode ?? false,
+      count: entry.count,
+      method: entry.method,
+      chosung: '',
+      allowedCities: entry.allowedCities ?? [],
+      demoMode: false,
+    })
+    setImagePreview(entry.prizeImageUrl ?? null)
+    setImageFileName(entry.prizeImageUrl ? '이전 이미지' : null)
+    setGiftPreviews((entry.prizeImages ?? []).map(url => url || null))
+    setGiftFileNames((entry.prizeImages ?? []).map(url => url ? '이전 이미지' : null))
+    setShowHistory(false)
+  }
 
   useEffect(() => {
     fetchUsers(); fetchRemote(); fetchHistory()
@@ -319,11 +367,21 @@ export default function AdminPage() {
               <History size={14} style={{ color: '#a1a1aa' }} />
               <span style={{ fontWeight: 600, fontSize: 14 }}>추첨 기록</span>
               <span style={{ fontSize: 12, color: '#52525b' }}>최근 {history.length}건</span>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                <button onClick={exportHistoryCsv} disabled={history.length === 0}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 8, border: '1px solid #3f3f46', background: '#27272a', color: history.length === 0 ? '#52525b' : '#a1a1aa', cursor: history.length === 0 ? 'default' : 'pointer', fontSize: 12 }}>
+                  <Download size={12} /> CSV
+                </button>
+                <button onClick={clearHistory} disabled={history.length === 0}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 8, border: '1px solid #3f3f46', background: '#27272a', color: history.length === 0 ? '#52525b' : '#f87171', cursor: history.length === 0 ? 'default' : 'pointer', fontSize: 12 }}>
+                  <Trash2 size={12} /> 초기화
+                </button>
+              </div>
             </div>
             {history.length === 0
               ? <p style={{ fontSize: 13, color: '#52525b', textAlign: 'center', padding: '16px 0' }}>추첨 기록이 없습니다</p>
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {history.map((h, i) => <HistoryCard key={i} entry={h} />)}
+                  {history.map((h, i) => <HistoryCard key={i} entry={h} onReuse={reuseHistory} />)}
                 </div>
             }
           </div>
@@ -646,7 +704,7 @@ export default function AdminPage() {
   )
 }
 
-function HistoryCard({ entry }: { entry: HistoryEntry }) {
+function HistoryCard({ entry, onReuse }: { entry: HistoryEntry; onReuse: (entry: HistoryEntry) => void }) {
   const [open, setOpen] = useState(false)
   const [sending, setSending] = useState<string | null>(null)
   const date = new Date(entry.savedAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -684,6 +742,16 @@ function HistoryCard({ entry }: { entry: HistoryEntry }) {
       </button>
       {open && (
         <div style={{ borderTop: '1px solid #3f3f46', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6, marginBottom: 4 }}>
+            <HistoryMetric label="방식" value={methodLabel(entry.method)} />
+            <HistoryMetric label="풀" value={`${entry.pool.length}명`} />
+            <HistoryMetric label="확인" value={`${confirmed}/${entry.winners.length}`} />
+            <HistoryMetric label="지역" value={(entry.allowedCities?.length ?? 0) > 0 ? `${entry.allowedCities!.length}개` : '전체'} />
+          </div>
+          <button onClick={() => onReuse(entry)}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 10px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: '1px solid #3f3f46', background: '#18181b', color: '#a1a1aa' }}>
+            <ClipboardCopy size={12} /> 이 설정으로 다시 추첨
+          </button>
           {entry.winners.map((w, i) => {
             const slotImg = entry.giftMode ? (entry.prizeImages?.[i] || null) : (entry.prizeImageUrl || null)
             return (
@@ -777,6 +845,15 @@ function Field({ label, children }: { label: string | React.ReactNode; children:
     <div style={{ marginBottom: 18 }}>
       <label style={{ display: 'flex', alignItems: 'center', fontSize: 11, fontWeight: 600, color: '#71717a', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>
       {children}
+    </div>
+  )
+}
+
+function HistoryMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ borderRadius: 8, background: '#18181b', border: '1px solid #3f3f46', padding: '8px 6px', minWidth: 0 }}>
+      <p style={{ margin: 0, fontSize: 10, color: '#71717a' }}>{label}</p>
+      <p style={{ margin: '3px 0 0', fontSize: 12, fontWeight: 700, color: '#e4e4e7', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</p>
     </div>
   )
 }
@@ -889,6 +966,14 @@ function compressImage(file: File, maxPx: number, quality: number): Promise<stri
     }
     reader.readAsDataURL(file)
   })
+}
+
+function csvCell(value: string) {
+  return `"${value.replace(/"/g, '""')}"`
+}
+
+function methodLabel(method: RaffleMethod) {
+  return METHOD_OPTIONS.find(option => option.value === method && !option.comingSoon)?.label ?? method
 }
 
 function resolveScore(u: { score?: number; gpsLat?: number }) {

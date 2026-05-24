@@ -17,6 +17,9 @@ async function cmd(command: unknown[]) {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  if (req.method === 'OPTIONS') return res.status(200).end()
   if (!REDIS_URL || !REDIS_TOKEN) return res.status(500).json({ error: 'Redis not configured' })
 
   if (req.method === 'GET') {
@@ -29,6 +32,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const entry = { ...req.body, savedAt: Date.now() }
     await cmd(['LPUSH', HISTORY_KEY, JSON.stringify(entry)])
     await cmd(['LTRIM', HISTORY_KEY, 0, MAX_HISTORY - 1])
+    return res.status(200).json({ ok: true })
+  }
+
+  if (req.method === 'DELETE') {
+    await cmd(['DEL', HISTORY_KEY])
     return res.status(200).json({ ok: true })
   }
 
