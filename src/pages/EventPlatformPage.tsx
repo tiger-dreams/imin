@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowLeft, CalendarDays, CheckCircle, Clipboard, Clock, Copy, ExternalLink, Gift,
-  Heart, Home, Link as LinkIcon, Loader2, LogOut, MapPin, MessageCircle,
+  GitBranch, Heart, Home, Link as LinkIcon, Loader2, LogOut, MapPin, MessageCircle,
   MonitorPlay, Plus, Send, Share2, Sparkles, Ticket, UserRound, Users,
 } from 'lucide-react'
 import liff from '@line/liff'
@@ -351,6 +351,17 @@ function EventHomePage({
           </div>
           <ExternalLink size={16} style={{ color: '#8d7a67' }} />
         </button>
+
+        <a href="/release" className="w-full rounded-2xl p-4 text-left flex items-center gap-3" style={{ background: '#fffaf2', border: '1px solid #eadfcc', textDecoration: 'none', color: 'inherit' }}>
+          <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: '#f4eadc', color: '#7a5b3d' }}>
+            <GitBranch size={18} />
+          </div>
+          <div className="flex-1">
+            <p className="font-bold">릴리즈 내역</p>
+            <p className="text-xs" style={{ color: '#8d7a67' }}>최근 GSD 작업과 검증 로그를 확인합니다</p>
+          </div>
+          <ExternalLink size={16} style={{ color: '#8d7a67' }} />
+        </a>
       </main>
       {showProfile && (
         <ProfileSheet

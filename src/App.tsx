@@ -8,6 +8,7 @@ import AdminHubPage from './pages/AdminHubPage'
 import AdminWallPage from './pages/AdminWallPage'
 import WallPage from './pages/WallPage'
 import EventPlatformPage from './pages/EventPlatformPage'
+import ReleaseNotesPage from './pages/ReleaseNotesPage'
 import type { LocationData } from './pages/VerifyPage'
 
 function AppRoutes({ path }: { path: string }) {
@@ -48,6 +49,7 @@ export default function App() {
   }, [])
 
   if (path === '/wall') return <WallPage />
+  if (path === '/release') return <ReleaseNotesPage />
   if (path === '/admin/raffle') return <AdminPage />
   if (path === '/admin/wall') return <AdminWallPage />
   if (path === '/admin') return <AdminHubPage />

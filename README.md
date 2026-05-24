@@ -29,6 +29,7 @@ LINE 로그인 (LIFF)
 | 참석 재확인 (RSVP) | 참가 확정자 대상 참석/고민 중/불참, 동반 인원, 메시지 저장 |
 | LINE 공유 | LIFF Share Target Picker 지원 환경에서는 친구/그룹으로 Flex 초대장 공유, 그 외 환경은 Web Share API/링크 복사 fallback |
 | 온라인 입장 | 온라인/하이브리드 행사에서 참가 확정자 또는 주최자가 웨비나/그룹콜 링크로 입장하고 온라인 출석 기록 |
+| 릴리즈 내역 | `/release` — 최근 GSD 작업, 검증 결과, 관련 이슈와 QA 로그 확인 |
 | GeoIP 인증 | ipapi.co 기반 국가/도시 확인 |
 | GPS 인증 | 브라우저 Geolocation API |
 | Presence Score | 체크인 40pt + GeoIP 20pt + GPS 20pt |
@@ -63,6 +64,7 @@ imin/
 │   │   └── LiffContext.tsx # LINE LIFF 초기화 & 프로필
 │   └── pages/
 │       ├── EventPlatformPage.tsx # 행사 홈/생성/상세/신청자 관리
+│       ├── ReleaseNotesPage.tsx # 릴리즈 내역
 │       ├── LoginPage.tsx   # LINE 로그인
 │       ├── VerifyPage.tsx  # GeoIP + GPS 검증
 │       ├── MainPage.tsx    # 기능 메뉴
