@@ -517,6 +517,17 @@ function EventCreatePage({ onBack, onCreated }: { onBack: () => void; onCreated:
   }))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const hasTitle = form.title.trim().length > 0
+  const hasStartAt = form.startsAt.trim().length > 0
+  const hasLocation = form.eventType === 'online'
+    ? form.onlineUrl.trim().length > 0
+    : form.venueName.trim().length > 0
+  const canSubmit = hasTitle && hasStartAt && hasLocation && !saving
+  const missingRequired = [
+    !hasTitle && '제목',
+    !hasStartAt && '시작 일정',
+    !hasLocation && (form.eventType === 'online' ? '온라인 입장 링크' : '장소'),
+  ].filter(Boolean).join(', ')
 
   const update = <K extends keyof EventFormState>(key: K, value: EventFormState[K]) =>
     setForm(prev => ({ ...prev, [key]: value }))
@@ -549,6 +560,7 @@ function EventCreatePage({ onBack, onCreated }: { onBack: () => void; onCreated:
     if (!form.title.trim()) return setError('행사 제목을 입력해 주세요.')
     if (!form.startsAt) return setError('시작 날짜와 시간을 입력해 주세요.')
     if (form.eventType !== 'online' && !form.venueName.trim()) return setError('장소 이름을 입력해 주세요.')
+    if (form.eventType === 'online' && !form.onlineUrl.trim()) return setError('온라인 입장 링크나 안내를 입력해 주세요.')
 
     setSaving(true)
     try {
@@ -577,7 +589,7 @@ function EventCreatePage({ onBack, onCreated }: { onBack: () => void; onCreated:
         </div>
       </header>
 
-      <main className="px-4 py-5 space-y-4 max-w-3xl mx-auto">
+      <main className="px-4 pt-5 pb-36 space-y-4 max-w-3xl mx-auto">
         <CreatePreview form={form} hostName={profile?.displayName ?? '주최자'} />
 
         <FormBand title="기본 정보" icon={<Heart size={16} />}>
@@ -597,8 +609,8 @@ function EventCreatePage({ onBack, onCreated }: { onBack: () => void; onCreated:
               ))}
             </div>
           </Field>
-          <Field label="제목">
-            <input value={form.title} onChange={e => update('title', e.target.value)} style={lightInput} placeholder="예: 토요일 커뮤니티 밋업" />
+          <Field label="제목" required>
+            <input value={form.title} onChange={e => update('title', e.target.value)} style={lightInput} placeholder="예: 토요일 커뮤니티 밋업" required aria-invalid={!hasTitle} />
           </Field>
           <Field label={form.category === 'wedding' ? '신랑/신부 또는 공동 주최자' : '공동 주최자'}>
             <input value={form.coHostName} onChange={e => update('coHostName', e.target.value)} style={lightInput} placeholder="예: 지우" />
@@ -613,8 +625,8 @@ function EventCreatePage({ onBack, onCreated }: { onBack: () => void; onCreated:
 
         <FormBand title="일정과 장소" icon={<CalendarDays size={16} />}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
-            <Field label="시작">
-              <input type="datetime-local" value={form.startsAt} onChange={e => update('startsAt', e.target.value)} style={lightInput} />
+            <Field label="시작" required>
+              <input type="datetime-local" value={form.startsAt} onChange={e => update('startsAt', e.target.value)} style={lightInput} required aria-invalid={!hasStartAt} />
             </Field>
             <Field label="종료">
               <input type="datetime-local" value={form.endsAt} onChange={e => update('endsAt', e.target.value)} style={lightInput} />
@@ -637,8 +649,8 @@ function EventCreatePage({ onBack, onCreated }: { onBack: () => void; onCreated:
           </Field>
           {form.eventType !== 'online' && (
             <>
-              <Field label="장소 이름">
-                <input value={form.venueName} onChange={e => update('venueName', e.target.value)} style={lightInput} placeholder="예: 라움 아트센터" />
+              <Field label="장소 이름" required>
+                <input value={form.venueName} onChange={e => update('venueName', e.target.value)} style={lightInput} placeholder="예: 라움 아트센터 또는 미정" required aria-invalid={!hasLocation} />
               </Field>
               <Field label="주소">
                 <input value={form.address} onChange={e => update('address', e.target.value)} style={lightInput} placeholder="예: 서울 강남구 ..." />
@@ -646,8 +658,8 @@ function EventCreatePage({ onBack, onCreated }: { onBack: () => void; onCreated:
             </>
           )}
           {form.eventType !== 'offline' && (
-            <Field label="온라인 입장 링크">
-              <input value={form.onlineUrl} onChange={e => update('onlineUrl', e.target.value)} style={lightInput} placeholder="https://meet..." />
+            <Field label="온라인 입장 링크" required={form.eventType === 'online'}>
+              <input value={form.onlineUrl} onChange={e => update('onlineUrl', e.target.value)} style={lightInput} placeholder="https://meet... 또는 추후 안내" required={form.eventType === 'online'} aria-invalid={form.eventType === 'online' && !hasLocation} />
             </Field>
           )}
         </FormBand>
@@ -683,11 +695,32 @@ function EventCreatePage({ onBack, onCreated }: { onBack: () => void; onCreated:
 
         {error && <p className="rounded-2xl px-4 py-3 text-sm font-semibold" style={{ background: '#fff1f2', color: '#be123c', border: '1px solid #fecdd3' }}>{error}</p>}
 
-        <button onClick={submit} disabled={saving} className="w-full rounded-2xl py-4 font-black flex items-center justify-center gap-2" style={{ background: '#302820', color: '#fffaf2', opacity: saving ? 0.65 : 1 }}>
-          {saving ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-          {saving ? '등록 중...' : '행사 등록하고 초대장 열기'}
-        </button>
       </main>
+
+      <footer className="fixed left-0 right-0 bottom-0 z-20 px-4 pt-3" style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))', background: 'linear-gradient(180deg, rgba(251,248,242,0), rgba(251,248,242,0.92) 18%, #fbf8f2 48%)' }}>
+        <div className="max-w-3xl mx-auto">
+          {missingRequired && (
+            <p className="text-xs font-bold mb-2 px-1" style={{ color: '#8d6e52' }}>
+              필수 정보: {missingRequired}
+            </p>
+          )}
+          <button
+            onClick={submit}
+            disabled={!canSubmit}
+            className="w-full rounded-2xl py-4 font-black flex items-center justify-center gap-2"
+            style={{
+              background: canSubmit ? '#302820' : '#d8c9b8',
+              color: canSubmit ? '#fffaf2' : '#8d7a67',
+              opacity: canSubmit ? 1 : 0.72,
+              boxShadow: canSubmit ? '0 16px 34px rgba(48,40,32,0.24)' : 'none',
+              cursor: canSubmit ? 'pointer' : 'not-allowed',
+            }}
+          >
+            {saving ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
+            {saving ? '등록 중...' : '행사 등록하고 초대장 열기'}
+          </button>
+        </div>
+      </footer>
     </div>
   )
 }
@@ -1128,10 +1161,12 @@ function FormBand({ title, icon, children }: { title: string; icon: React.ReactN
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, required = false, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <label className="block min-w-0">
-      <span className="block text-xs font-black mb-2" style={{ color: '#8d6e52' }}>{label}</span>
+      <span className="block text-xs font-black mb-2" style={{ color: '#8d6e52' }}>
+        {label}{required && <span aria-hidden="true" style={{ color: '#be123c' }}> *</span>}
+      </span>
       {children}
     </label>
   )
