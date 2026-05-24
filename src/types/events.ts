@@ -55,6 +55,8 @@ export interface EventParticipation {
   companions: number
   message?: string
   rsvpMessage?: string
+  onlineEnteredAt?: number
+  checkedInAt?: number
   createdAt: number
   updatedAt: number
   decidedAt?: number

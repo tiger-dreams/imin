@@ -4,6 +4,7 @@ import {
   Heart, Home, Link as LinkIcon, Loader2, LogOut, MapPin, MessageCircle,
   MonitorPlay, Plus, Send, Share2, Sparkles, Ticket, UserRound, Users,
 } from 'lucide-react'
+import liff from '@line/liff'
 import { useLiff } from '../contexts/LiffContext'
 import type { ApplicationStatus, EventCategory, EventFormState, EventParticipation, EventRecord, EventType, RsvpStatus } from '../types/events'
 
@@ -664,7 +665,7 @@ function EventDetailPage({
   loadState: LoadState
   onBack: () => void
   onNavigate: (path: string) => void
-  onApply: (payload: { applicationStatus?: ApplicationStatus; rsvpStatus?: RsvpStatus; companions: number; message: string; rsvpMessage?: string }) => Promise<void>
+  onApply: (payload: { applicationStatus?: ApplicationStatus; rsvpStatus?: RsvpStatus; companions: number; message: string; rsvpMessage?: string; onlineEnteredAt?: number; checkedInAt?: number }) => Promise<void>
   onHostUpdate: (target: EventParticipation, applicationStatus: ApplicationStatus) => Promise<void>
 }) {
   const [status, setStatus] = useState<RsvpStatus>(participation?.rsvpStatus ?? 'attending')
@@ -698,6 +699,8 @@ function EventDetailPage({
   const shareUrl = `${window.location.origin}/events/${event.id}`
   const isHost = viewerUserId === event.hostUserId
   const isConfirmed = participation?.applicationStatus === 'confirmed'
+  const canEnterOnline = !!event.onlineUrl && (isHost || isConfirmed)
+  const entryState = resolveOnlineEntryState(event)
   const submitApplication = async () => {
     setSaving(true)
     try {
@@ -729,7 +732,9 @@ function EventDetailPage({
   const share = async () => {
     const text = `${event.title}\n${formatDate(event.startsAt)}\n${event.venueName ?? event.onlineUrl ?? ''}`
     try {
-      if (navigator.share) {
+      if (await shareWithLineTargetPicker(event, shareUrl)) {
+        // LINE share target picker was used.
+      } else if (navigator.share) {
         await navigator.share({ title: event.title, text, url: shareUrl })
       } else {
         await navigator.clipboard.writeText(shareUrl)
@@ -741,6 +746,21 @@ function EventDetailPage({
       setShareDone(true)
       setTimeout(() => setShareDone(false), 1800)
     }
+  }
+
+  const enterOnline = async () => {
+    if (!event.onlineUrl || (!isHost && !isConfirmed)) return
+    if (!isHost) {
+      await onApply({
+        applicationStatus: 'confirmed',
+        rsvpStatus: participation?.rsvpStatus,
+        companions,
+        message: participation?.message ?? message,
+        rsvpMessage,
+        onlineEnteredAt: Date.now(),
+      })
+    }
+    window.open(event.onlineUrl, '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -790,9 +810,24 @@ function EventDetailPage({
           {event.venueName && <p className="font-black text-lg">{event.venueName}</p>}
           {event.address && <p className="text-sm mt-1" style={{ color: '#6f5c4a' }}>{event.address}</p>}
           {event.onlineUrl && (
-            <a href={event.onlineUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold" style={{ background: '#302820', color: '#fffaf2' }}>
-              <ExternalLink size={14} /> 온라인 입장
-            </a>
+            <div className="mt-3 space-y-3">
+              <div className="rounded-2xl p-4" style={{ background: '#fbf8f2', border: '1px solid #eadfcc' }}>
+                <p className="text-xs font-black" style={{ color: '#9b7654' }}>{onlineEntryStatusLabel(entryState)}</p>
+                <p className="text-sm mt-1 break-all" style={{ color: '#6f5c4a' }}>{event.onlineUrl}</p>
+                {participation?.onlineEnteredAt && (
+                  <p className="text-xs font-bold mt-2" style={{ color: '#16803a' }}>입장 기록: {formatDate(participation.onlineEnteredAt)}</p>
+                )}
+              </div>
+              <button
+                onClick={enterOnline}
+                disabled={!canEnterOnline || entryState === 'ended'}
+                className="w-full rounded-2xl px-4 py-3 text-sm font-black flex items-center justify-center gap-2"
+                style={{ background: canEnterOnline && entryState !== 'ended' ? '#302820' : '#eadfcc', color: canEnterOnline && entryState !== 'ended' ? '#fffaf2' : '#8d7a67' }}
+              >
+                <ExternalLink size={14} />
+                {isHost ? '온라인 룸 열기' : isConfirmed ? '온라인 입장하고 출석 기록' : '참가 확정 후 입장 가능'}
+              </button>
+            </div>
           )}
         </InfoBand>
 
@@ -1162,6 +1197,8 @@ async function saveParticipation(eventId: string, payload: {
   companions: number
   message: string
   rsvpMessage?: string
+  onlineEnteredAt?: number
+  checkedInAt?: number
 }) {
   if (useLocalEventStore()) {
     return writeLocalParticipation({ eventId, ...payload, createdAt: Date.now(), updatedAt: Date.now() })
@@ -1276,6 +1313,8 @@ function writeLocalParticipation(participation: Partial<EventParticipation> & {
     companions: participation.companions,
     message: participation.message || previous?.message,
     rsvpMessage: participation.rsvpMessage ?? previous?.rsvpMessage,
+    onlineEnteredAt: participation.onlineEnteredAt ?? previous?.onlineEnteredAt,
+    checkedInAt: participation.checkedInAt ?? previous?.checkedInAt,
     createdAt: previous?.createdAt ?? participation.createdAt ?? now,
     updatedAt: now,
     decidedAt: participation.applicationStatus && participation.applicationStatus !== previous?.applicationStatus ? now : previous?.decidedAt,
@@ -1321,7 +1360,80 @@ function slugify(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9가-힣]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'event'
 }
 
-function formatDate(value: string) {
+async function shareWithLineTargetPicker(event: EventRecord, shareUrl: string) {
+  const line = liff as unknown as {
+    isApiAvailable?: (apiName: string) => boolean
+    shareTargetPicker?: (messages: unknown[]) => Promise<unknown>
+  }
+  if (!line.isApiAvailable?.('shareTargetPicker') || !line.shareTargetPicker) return false
+
+  const where = event.eventType === 'online'
+    ? '온라인'
+    : [event.venueName, event.address].filter(Boolean).join(' · ')
+  const hero = event.coverImageUrl
+    ? {
+        type: 'image',
+        url: event.coverImageUrl,
+        size: 'full',
+        aspectRatio: '20:13',
+        aspectMode: 'cover',
+        action: { type: 'uri', label: '행사 보기', uri: shareUrl },
+      }
+    : undefined
+
+  await line.shareTargetPicker([{
+    type: 'flex',
+    altText: `${event.title} 초대장이 도착했어요`,
+    contents: {
+      type: 'bubble',
+      size: 'mega',
+      ...(hero ? { hero } : {}),
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          { type: 'text', text: event.title, weight: 'bold', size: 'xl', wrap: true, color: '#302820' },
+          { type: 'text', text: formatDate(event.startsAt), size: 'sm', color: '#8d7a67', margin: 'md', wrap: true },
+          ...(where ? [{ type: 'text', text: where, size: 'sm', color: '#8d7a67', margin: 'xs', wrap: true }] : []),
+          { type: 'separator', margin: 'lg' },
+          { type: 'text', text: event.description.slice(0, 120), size: 'sm', color: '#6f5c4a', margin: 'lg', wrap: true },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [{
+          type: 'button',
+          style: 'primary',
+          color: '#302820',
+          action: { type: 'uri', label: '참여 신청하기', uri: shareUrl },
+        }],
+      },
+    },
+  }])
+  return true
+}
+
+type OnlineEntryState = 'before' | 'open' | 'ended'
+
+function resolveOnlineEntryState(event: EventRecord): OnlineEntryState {
+  const now = Date.now()
+  const start = new Date(event.startsAt).getTime()
+  const end = event.endsAt ? new Date(event.endsAt).getTime() : start + 3 * 60 * 60 * 1000
+  if (Number.isFinite(end) && now > end) return 'ended'
+  if (Number.isFinite(start) && now < start - 30 * 60 * 1000) return 'before'
+  return 'open'
+}
+
+function onlineEntryStatusLabel(state: OnlineEntryState) {
+  return ({
+    before: '행사 시작 30분 전부터 입장할 수 있어요',
+    open: '온라인 입장 가능',
+    ended: '온라인 행사가 종료됐어요',
+  } as Record<OnlineEntryState, string>)[state]
+}
+
+function formatDate(value: string | number) {
   if (!value) return '일정 미정'
   return new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long', timeStyle: 'short' }).format(new Date(value))
 }

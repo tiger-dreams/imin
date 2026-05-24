@@ -27,7 +27,8 @@ LINE 로그인 (LIFF)
 | 행사 홈/상세 | 공개 행사 목록, 내가 만든 행사, eventId 기반 초대장 상세 |
 | 참여 신청 | 공개 행사 신청, 주최자 승인, 대기/거절 상태 관리 |
 | 참석 재확인 (RSVP) | 참가 확정자 대상 참석/고민 중/불참, 동반 인원, 메시지 저장 |
-| 공유 | Web Share API 또는 링크 복사로 친구에게 초대장 전달 |
+| LINE 공유 | LIFF Share Target Picker 지원 환경에서는 친구/그룹으로 Flex 초대장 공유, 그 외 환경은 Web Share API/링크 복사 fallback |
+| 온라인 입장 | 온라인/하이브리드 행사에서 참가 확정자 또는 주최자가 웨비나/그룹콜 링크로 입장하고 온라인 출석 기록 |
 | GeoIP 인증 | ipapi.co 기반 국가/도시 확인 |
 | GPS 인증 | 브라우저 Geolocation API |
 | Presence Score | 체크인 40pt + GeoIP 20pt + GPS 20pt |
@@ -50,7 +51,7 @@ LINE 로그인 (LIFF)
 imin/
 ├── api/                    # Vercel Serverless Functions
 │   ├── events.ts           # GET/POST /api/events — 행사 목록/상세/생성
-│   │                       # action=participation — 신청/승인/참석 재확인 조회/저장
+│   │                       # action=participation — 신청/승인/참석 재확인/온라인 입장 조회/저장
 │   ├── checkin.ts          # POST /api/checkin — 체크인 & Redis 등록
 │   ├── active.ts           # GET  /api/active  — 실시간 접속자 목록
 │   ├── heartbeat.ts        # POST /api/heartbeat — TTL 갱신

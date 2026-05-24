@@ -183,6 +183,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         companions?: number
         message?: string
         rsvpMessage?: string
+        onlineEnteredAt?: number
+        checkedInAt?: number
         decidedAt?: number
         rsvpUpdatedAt?: number
       } : null
@@ -205,6 +207,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         companions: body.companions === undefined ? previous?.companions ?? 0 : Math.max(0, Math.min(10, Math.floor(Number(body.companions) || 0))),
         message: text(body.message).slice(0, 500) || previous?.message || undefined,
         rsvpMessage: text(body.rsvpMessage).slice(0, 500) || previous?.rsvpMessage || undefined,
+        onlineEnteredAt: Number.isFinite(Number(body.onlineEnteredAt)) ? Number(body.onlineEnteredAt) : previous?.onlineEnteredAt,
+        checkedInAt: Number.isFinite(Number(body.checkedInAt)) ? Number(body.checkedInAt) : previous?.checkedInAt,
         createdAt: previous?.createdAt ?? now,
         updatedAt: now,
         decidedAt: nextApplicationStatus !== previous?.applicationStatus ? now : previous?.decidedAt,
