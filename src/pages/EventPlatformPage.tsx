@@ -769,6 +769,12 @@ function EventDetailPage({
 
   const openCheckIn = () => {
     if (!canCheckIn) return
+    sessionStorage.setItem('imin:checkin-context', JSON.stringify({
+      eventId: event.id,
+      title: event.title,
+      venueName: event.venueName,
+      returnPath: `/events/${event.id}`,
+    }))
     window.history.pushState({}, '', '/checkin')
     window.dispatchEvent(new PopStateEvent('popstate'))
   }

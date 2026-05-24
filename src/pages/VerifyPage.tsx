@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { MapPin, Globe, CheckCircle, ChevronRight, RefreshCw } from 'lucide-react'
+import { ArrowLeft, MapPin, Globe, CheckCircle, ChevronRight, RefreshCw } from 'lucide-react'
 import { useLiff } from '../contexts/LiffContext'
 
 export interface LocationData {
@@ -21,8 +21,24 @@ interface Props {
   onVerified: (data: LocationData) => void
 }
 
+interface CheckinContext {
+  eventId?: string
+  title?: string
+  venueName?: string
+  returnPath?: string
+}
+
+const readCheckinContext = (): CheckinContext | null => {
+  try {
+    return JSON.parse(sessionStorage.getItem('imin:checkin-context') || 'null') as CheckinContext | null
+  } catch {
+    return null
+  }
+}
+
 export default function VerifyPage({ onVerified }: Props) {
   const { profile } = useLiff()
+  const [context] = useState<CheckinContext | null>(() => readCheckinContext())
 
   const [geoStatus, setGeoStatus] = useState<'loading' | 'ok' | 'error'>('loading')
   const [geoData, setGeoData] = useState<Partial<LocationData>>({})
@@ -91,6 +107,11 @@ export default function VerifyPage({ onVerified }: Props) {
   }
 
   const canCheckin = geoStatus === 'ok' && gpsStatus === 'ok'
+  const goBack = () => {
+    if (!context?.returnPath) return
+    window.history.pushState({}, '', context.returnPath)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }
 
   const handleCheckin = async () => {
     if (!canCheckin || !geoData.ip) return
@@ -133,34 +154,50 @@ export default function VerifyPage({ onVerified }: Props) {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col" style={{ background: 'var(--bg)' }}>
+    <div className="min-h-dvh flex flex-col" style={{ background: '#fbf8f2', color: '#302820' }}>
       {/* Header */}
-      <div className="px-5 pt-6 pb-4">
-        <span className="text-2xl font-bold" style={{ color: 'var(--text)' }}>imin</span>
-        <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-          I'm in! 전에 현재 위치를 확인합니다
-        </p>
+      <div className="px-4 pt-5 pb-4">
+        <div className="flex items-center gap-3">
+          {context?.returnPath && (
+            <button onClick={goBack} className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: '#fffaf2', border: '1px solid #eadfcc' }} aria-label="행사로 돌아가기">
+              <ArrowLeft size={18} />
+            </button>
+          )}
+          <div className="min-w-0">
+            <p className="text-xs font-black" style={{ color: '#9b7654' }}>{context?.title ?? 'imin check-in'}</p>
+            <h1 className="text-2xl font-black leading-tight">현장 체크인</h1>
+            <p className="text-sm mt-1 truncate" style={{ color: '#8d7a67' }}>
+              {context?.venueName ? `${context.venueName}에서 위치를 확인합니다` : '체크인 전에 현재 위치를 확인합니다'}
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="flex-1 px-4 space-y-3">
+        <div className="rounded-[28px] p-5" style={{ background: '#302820', color: '#fffaf2' }}>
+          <p className="text-xs font-bold opacity-80">I'm in</p>
+          <p className="text-3xl font-black leading-tight mt-2">지금 여기 있는<br />사람만 인증합니다</p>
+          <p className="text-sm leading-6 mt-3 opacity-75">GeoIP와 GPS를 확인한 뒤 체크인 완료 화면으로 이어집니다.</p>
+        </div>
+
         {/* GeoIP */}
         <div
-          className="rounded-2xl p-5 space-y-3"
-          style={{ background: 'var(--bg-card)', border: `1px solid ${geoStatus === 'ok' ? 'var(--green-dim)' : 'var(--border)'}` }}
+          className="rounded-3xl p-5 space-y-3"
+          style={{ background: '#fffaf2', border: `1px solid ${geoStatus === 'ok' ? '#b7d9bc' : '#eadfcc'}` }}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Globe size={16} style={{ color: geoStatus === 'ok' ? 'var(--green)' : 'var(--text-muted)' }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>GeoIP</span>
+              <Globe size={16} style={{ color: geoStatus === 'ok' ? '#16803a' : '#8d7a67' }} />
+              <span className="text-sm font-black">GeoIP</span>
             </div>
             <div className="flex items-center gap-2">
               {geoStatus === 'loading' && (
-                <div className="w-4 h-4 border-2 border-[#4ade80] border-t-transparent rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-[#16803a] border-t-transparent rounded-full animate-spin" />
               )}
-              {geoStatus === 'ok' && <CheckCircle size={16} style={{ color: 'var(--green)' }} />}
+              {geoStatus === 'ok' && <CheckCircle size={16} style={{ color: '#16803a' }} />}
               {geoStatus === 'error' && (
                 <button onClick={fetchGeo}>
-                  <RefreshCw size={14} style={{ color: 'var(--text-muted)' }} />
+                  <RefreshCw size={14} style={{ color: '#8d7a67' }} />
                 </button>
               )}
             </div>
@@ -179,31 +216,28 @@ export default function VerifyPage({ onVerified }: Props) {
         </div>
 
         {/* GPS */}
-        <div
-          className="rounded-2xl p-5 space-y-3"
-          style={{ background: 'var(--bg-card)', border: `1px solid ${gpsStatus === 'ok' ? 'var(--green-dim)' : 'var(--border)'}` }}
-        >
+        <div className="rounded-3xl p-5 space-y-3" style={{ background: '#fffaf2', border: `1px solid ${gpsStatus === 'ok' ? '#b7d9bc' : '#eadfcc'}` }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <MapPin size={16} style={{ color: gpsStatus === 'ok' ? 'var(--green)' : 'var(--text-muted)' }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>GPS 위치</span>
+              <MapPin size={16} style={{ color: gpsStatus === 'ok' ? '#16803a' : '#8d7a67' }} />
+              <span className="text-sm font-black">GPS 위치</span>
             </div>
-            {gpsStatus === 'ok' && <CheckCircle size={16} style={{ color: 'var(--green)' }} />}
+            {gpsStatus === 'ok' && <CheckCircle size={16} style={{ color: '#16803a' }} />}
             {gpsStatus === 'loading' && (
-              <div className="w-4 h-4 border-2 border-[#4ade80] border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-[#16803a] border-t-transparent rounded-full animate-spin" />
             )}
           </div>
 
           {gpsStatus === 'idle' && (
             <button
               onClick={requestGps}
-              className="w-full py-3 rounded-xl text-sm font-semibold active:opacity-80"
-              style={{ background: 'var(--green)', color: '#0a0a0a' }}
+              className="w-full py-3 rounded-2xl text-sm font-black active:opacity-80"
+              style={{ background: '#302820', color: '#fffaf2' }}
             >
               위치 권한 요청
             </button>
           )}
-          {gpsStatus === 'loading' && <p className="text-sm" style={{ color: 'var(--text-muted)' }}>위치 확인 중...</p>}
+          {gpsStatus === 'loading' && <p className="text-sm" style={{ color: '#8d7a67' }}>위치 확인 중...</p>}
           {gpsStatus === 'ok' && gpsData && (
             <div className="space-y-1.5">
               {gpsAddress
@@ -225,7 +259,7 @@ export default function VerifyPage({ onVerified }: Props) {
           )}
           {gpsStatus === 'denied' && <p className="text-xs" style={{ color: '#f87171' }}>위치 권한이 거부됐어요. 브라우저 설정에서 허용해주세요.</p>}
           {gpsStatus === 'error' && (
-            <button onClick={requestGps} className="w-full py-3 rounded-xl text-sm font-semibold active:opacity-80" style={{ background: 'var(--bg-card2)', color: 'var(--text-muted)' }}>
+            <button onClick={requestGps} className="w-full py-3 rounded-2xl text-sm font-black active:opacity-80" style={{ background: '#f4eadc', color: '#6f5c4a' }}>
               다시 시도
             </button>
           )}
@@ -244,8 +278,8 @@ export default function VerifyPage({ onVerified }: Props) {
         <button
           onClick={handleCheckin}
           disabled={!canCheckin}
-          className="w-full py-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-30"
-          style={{ background: canCheckin ? 'var(--green)' : 'var(--bg-card2)', color: canCheckin ? '#0a0a0a' : 'var(--text-muted)' }}
+          className="w-full py-5 rounded-3xl font-black text-lg flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60"
+          style={{ background: canCheckin ? '#302820' : '#eadfcc', color: canCheckin ? '#fffaf2' : '#8d7a67' }}
         >
           <CheckCircle size={22} />
           I'm in!
@@ -259,8 +293,8 @@ export default function VerifyPage({ onVerified }: Props) {
 function Row({ label, value, flag }: { label: string; value: string; flag?: string }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-xs shrink-0" style={{ color: 'var(--text-muted)' }}>{label}</span>
-      <span className="text-xs font-mono text-right truncate" style={{ color: 'var(--text)' }}>
+      <span className="text-xs shrink-0" style={{ color: '#8d7a67' }}>{label}</span>
+      <span className="text-xs font-mono text-right truncate" style={{ color: '#302820' }}>
         {flag && <span className="mr-1">{countryFlag(flag)}</span>}
         {value}
       </span>
@@ -272,7 +306,7 @@ function Skeleton() {
   return (
     <div className="space-y-2">
       {[70, 85, 60].map((w, i) => (
-        <div key={i} className="h-3 rounded-md animate-pulse" style={{ background: 'var(--bg-card2)', width: `${w}%` }} />
+        <div key={i} className="h-3 rounded-md animate-pulse" style={{ background: '#f4eadc', width: `${w}%` }} />
       ))}
     </div>
   )

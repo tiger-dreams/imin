@@ -15,11 +15,26 @@ interface Props {
   location: LocationData
 }
 
+interface CheckinContext {
+  title?: string
+  venueName?: string
+  returnPath?: string
+}
+
+const readCheckinContext = (): CheckinContext | null => {
+  try {
+    return JSON.parse(sessionStorage.getItem('imin:checkin-context') || 'null') as CheckinContext | null
+  } catch {
+    return null
+  }
+}
+
 type View = 'menu' | 'raffle' | 'slides' | 'wall' | 'info'
 type SlideTab = 'live' | 'slides' | 'photos' | 'qa'
 
 export default function MainPage({ location }: Props) {
   const { profile, logout } = useLiff()
+  const [context] = useState<CheckinContext | null>(() => readCheckinContext())
   const [view, setView] = useState<View>('menu')
   const [showScoreTip, setShowScoreTip] = useState(false)
   useHeartbeat(profile?.userId)
@@ -30,45 +45,59 @@ export default function MainPage({ location }: Props) {
   if (view === 'info') return <InfoView onBack={() => setView('menu')} />
 
   const soon = () => alert('준비 중이에요!')
+  const backToEvent = () => {
+    if (!context?.returnPath) return
+    window.history.pushState({}, '', context.returnPath)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }
 
   return (
-    <div className="min-h-dvh flex flex-col pb-8" style={{ background: 'var(--bg)' }}>
+    <div className="min-h-dvh flex flex-col pb-8" style={{ background: '#fbf8f2', color: '#302820' }}>
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-6 pb-2">
         <div>
-          <span className="text-2xl font-bold" style={{ color: 'var(--text)' }}>imin</span>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Tech Week Hackathon Idea Competition KR</p>
+          <p className="text-xs font-black" style={{ color: '#9b7654' }}>{context?.title ?? 'imin check-in'}</p>
+          <h1 className="text-2xl font-black leading-tight">체크인 완료</h1>
+          <p className="text-xs mt-0.5" style={{ color: '#8d7a67' }}>{context?.venueName ?? `${location.city}, ${location.country}`}</p>
         </div>
-        <button onClick={logout} className="p-2 rounded-xl" style={{ background: 'var(--bg-card)' }}>
-          <LogOut size={15} style={{ color: 'var(--text-muted)' }} />
+        <button onClick={logout} className="p-2 rounded-xl" style={{ background: '#fffaf2', border: '1px solid #eadfcc' }}>
+          <LogOut size={15} style={{ color: '#8d7a67' }} />
         </button>
       </div>
 
       <div className="px-4 pt-2 space-y-3">
         {/* 프로필 + 체크인 뱃지 */}
-        <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: 'var(--bg-card)', border: '1px solid var(--green-dim)' }}>
-          {profile?.pictureUrl ? (
-            <img src={profile.pictureUrl} alt="avatar" className="w-12 h-12 rounded-full object-cover" />
-          ) : (
-            <div className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold" style={{ background: '#1f2937', color: 'var(--green)' }}>
-              {(profile?.displayName ?? '?')[0]}
+        <div className="rounded-[28px] p-5" style={{ background: '#302820', color: '#fffaf2' }}>
+          <div className="flex items-center gap-3">
+            {profile?.pictureUrl ? (
+              <img src={profile.pictureUrl} alt="avatar" className="w-12 h-12 rounded-full object-cover" />
+            ) : (
+              <div className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-black" style={{ background: 'rgba(255,250,242,0.14)' }}>
+                {(profile?.displayName ?? '?')[0]}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="font-black text-base truncate">{profile?.displayName ?? '참가자'}</p>
+              <p className="text-xs mt-0.5 opacity-75">{location.city}, {location.country}</p>
             </div>
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-2xl" style={{ background: '#e8f7ec', color: '#16803a' }}>
+              <CheckCircle size={14} />
+              <span className="text-xs font-black">I'm in!</span>
+            </div>
+          </div>
+          <p className="text-sm leading-6 mt-4 opacity-80">현장 인증이 완료됐습니다. 추첨, 메시지 월, 발표 자료로 이어서 참여할 수 있어요.</p>
+          {context?.returnPath && (
+            <button onClick={backToEvent} className="mt-4 w-full rounded-2xl py-3 text-sm font-black" style={{ background: '#fffaf2', color: '#302820' }}>
+              행사 상세로 돌아가기
+            </button>
           )}
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm truncate" style={{ color: 'var(--text)' }}>{profile?.displayName ?? '참가자'}</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{location.city}, {location.country}</p>
-          </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl" style={{ background: '#0d2818', border: '1px solid var(--green-dim)' }}>
-            <CheckCircle size={13} style={{ color: 'var(--green)' }} />
-            <span className="text-xs font-semibold" style={{ color: 'var(--green)' }}>I'm in!</span>
-          </div>
         </div>
 
         {/* Presence Score */}
         <PresenceBar location={location} onInfoClick={() => setShowScoreTip(true)} />
 
         {/* 메뉴 */}
-        <p className="text-xs font-semibold px-1 pt-1" style={{ color: 'var(--text-muted)' }}>FEATURES</p>
+        <p className="text-xs font-black px-1 pt-1" style={{ color: '#9b7654' }}>NEXT</p>
 
         <MenuItem icon={<Trophy size={18} style={{ color: '#facc15' }} />}              title="활성 세션 추첨"      desc="지금 앱을 열고 있는 사람만 대상"  color="#facc15" onClick={() => setView('raffle')} />
         <MenuItem icon={<MonitorPlay size={18} style={{ color: '#a78bfa' }} />}         title="발표 슬라이드"       desc="라이브 스트리밍 · 슬라이드 · Q&A" color="#a78bfa" onClick={() => setView('slides')} />
@@ -448,16 +477,16 @@ function MenuItem({ icon, title, desc, color, onClick }: {
   icon: React.ReactNode; title: string; desc: string; color: string; onClick: () => void
 }) {
   return (
-    <button onClick={onClick} className="w-full rounded-2xl p-4 flex items-center gap-4 text-left active:opacity-70 transition-opacity"
-      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${color}18` }}>
+    <button onClick={onClick} className="w-full rounded-3xl p-4 flex items-center gap-4 text-left active:opacity-70 transition-opacity"
+      style={{ background: '#fffaf2', border: '1px solid #eadfcc', color: '#302820' }}>
+      <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0" style={{ background: `${color}18` }}>
         {icon}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{title}</p>
-        <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{desc}</p>
+        <p className="text-sm font-black">{title}</p>
+        <p className="text-xs mt-0.5 truncate" style={{ color: '#8d7a67' }}>{desc}</p>
       </div>
-      <ChevronRight size={16} style={{ color: 'var(--text-muted)' }} />
+      <ChevronRight size={16} style={{ color: '#8d7a67' }} />
     </button>
   )
 }
@@ -598,14 +627,14 @@ function InfoView({ onBack }: { onBack: () => void }) {
 function PresenceBar({ location, onInfoClick }: { location: LocationData; onInfoClick: () => void }) {
   const score = location.score
   const label = score >= 60 ? '인증 완료' : '부분 인증'
-  const color = score >= 60 ? 'var(--green)' : '#facc15'
+  const color = score >= 60 ? '#16803a' : '#b7791f'
   return (
-    <div className="rounded-2xl p-4 space-y-2" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+    <div className="rounded-3xl p-4 space-y-2" style={{ background: '#fffaf2', border: '1px solid #eadfcc' }}>
       <div className="flex items-center justify-between">
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Presence Score</span>
+          <span className="text-xs font-bold" style={{ color: '#8d7a67' }}>Presence Score</span>
           <button onClick={onInfoClick} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-            <Info size={12} style={{ color: '#52525b' }} />
+            <Info size={12} style={{ color: '#9b7654' }} />
           </button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -613,7 +642,7 @@ function PresenceBar({ location, onInfoClick }: { location: LocationData; onInfo
           <span className="text-xs font-bold" style={{ color }}>{score}pt — {label}</span>
         </div>
       </div>
-      <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-card2)' }}>
+      <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: '#f4eadc' }}>
         <div className="h-full rounded-full transition-all duration-700" style={{ width: `${score}%`, background: color }} />
       </div>
     </div>

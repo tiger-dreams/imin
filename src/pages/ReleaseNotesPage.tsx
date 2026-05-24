@@ -12,6 +12,22 @@ interface ReleaseNote {
 const RELEASES: ReleaseNote[] = [
   {
     date: '2026-05-24',
+    title: '행사형 체크인 UX 통합',
+    summary: '레거시 체크인 화면을 행사 플랫폼 테마와 실제 사용자 흐름에 맞춰 재정리했습니다.',
+    highlights: [
+      '행사 상세에서 체크인 진입 시 행사명, 장소, 복귀 경로 저장',
+      'GeoIP/GPS 인증 화면을 초대장 기반의 밝은 테마로 변경',
+      '체크인 완료 메뉴를 행사 플랫폼 톤으로 변경',
+      '체크인 완료 후 행사 상세로 돌아가기 CTA 제공',
+    ],
+    checks: ['npm run build', 'git diff --check', 'Playwright 모바일 체크인 QA', 'API 함수 수 12개 유지'],
+    links: [
+      { label: 'Issue #14', href: 'https://github.com/tiger-dreams/imin/issues/14' },
+      { label: 'QA 로그', href: 'https://github.com/tiger-dreams/imin/blob/main/docs/release/agent_qa-2026-05-24-checkin-ux-integration.md' },
+    ],
+  },
+  {
+    date: '2026-05-24',
     title: '오늘 데모 행사 체크인 흐름',
     summary: '홈의 레거시 단일 체크인 링크를 숨기고, 매일 오늘 날짜로 갱신되는 샘플 행사 상세에서 체크인을 시작하도록 데모 흐름을 정리했습니다.',
     highlights: [
