@@ -19,6 +19,7 @@ No blocking P0/P1/P2 findings found.
 - No new API files were added; Vercel Hobby function count remains at 12.
 - The release notes page is static by design for this slice. If release notes become frequent, a markdown/content data structure should replace inline arrays.
 - The blog page is static by design for the first PMM article. Multiple posts should introduce a route/content model rather than growing one component indefinitely.
+- The Luma-inspired sample event is paraphrased and adapted as imin sample data rather than copied verbatim. It demonstrates manual approval, hidden exact venue, agenda-like description, and applicant-heavy stats.
 
 ## Verification
 
@@ -37,6 +38,9 @@ releaseLoginGate=0, errors=[]
 
 Playwright /blog
 blogLoginGate=0, errors=[]
+
+Playwright Luma-inspired sample event
+card visible, manual application CTA visible, errors=[]
 ```
 
 ## Residual Risk

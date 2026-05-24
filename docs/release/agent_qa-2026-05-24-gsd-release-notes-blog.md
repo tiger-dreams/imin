@@ -27,6 +27,8 @@ This work responds to the product need that a non-engineer hackathon team can ke
 | --- | --- | --- | --- |
 | `/release-notes` | Opens without LINE login and shows latest release notes. | `/tmp/imin-playwright-qa/release-notes-page.png`; `releaseLoginGate=0`, `errors=[]` | Pass |
 | `/blog` | Opens without LINE login and shows PMM article about using imin beyond Forms/Calendar/chat. | `/tmp/imin-playwright-qa/blog-page.png`; `blogLoginGate=0`, `errors=[]` | Pass |
+| `/` sample event card | Shows the approval-based technical meetup sample inspired by a Luma event structure. | `/tmp/imin-playwright-qa/sample-fde-event-card.png`; `errors=[]` | Pass |
+| `/events/sample-fde-night-seoul` | Opens sample detail and shows manual participation application CTA. | `/tmp/imin-playwright-qa/sample-fde-event-detail.png`; `errors=[]` | Pass |
 
 ## Release Notes
 
@@ -35,6 +37,7 @@ This work responds to the product need that a non-engineer hackathon team can ke
 - Updated GSD instructions to require release notes updates for user-facing work.
 - Updated GSD instructions to use a Product Marketing Manager lens for meaningful product-facing capabilities.
 - Added product and architecture documents for AI-led development stability.
+- Added a realistic approval-based technical meetup sample event modeled after a public Luma event pattern.
 
 ## Issues Found
 
