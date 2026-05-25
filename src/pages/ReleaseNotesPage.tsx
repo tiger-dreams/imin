@@ -11,6 +11,25 @@ interface ReleaseNote {
 
 const RELEASES: ReleaseNote[] = [
   {
+    date: '2026-05-25',
+    title: '행사 접수 운영과 호스트 권한 강화',
+    summary: '호스트가 신청량, 접수 기간, 노쇼 리스크를 제어할 수 있도록 행사 생성과 신청자 관리 흐름을 정리했습니다.',
+    highlights: [
+      '행사 만들기 CTA를 하단 고정으로 변경하고 필수 정보 미입력 시 비활성화',
+      '현장 체크인은 오프라인/하이브리드 행사 당일에만 노출',
+      '신청자 관리는 호스트 또는 설정된 관리자에게만 노출',
+      '정원 대비 100-150% 초과 확정률 설정과 확정 한도 표시',
+      '접수 한도, 접수 시작, 접수 마감 설정 추가',
+      '중요 본문 입력을 `행사 내용`으로 명확화',
+      'API에서 신청자 목록 조회, 신규 신청 기간/한도, 확정 한도 검증 강화',
+    ],
+    checks: ['npm run build', 'git diff --check', 'Playwright 행사 생성/상세 QA', 'API 함수 수 12개 유지'],
+    links: [
+      { label: 'Issue #16', href: 'https://github.com/tiger-dreams/imin/issues/16' },
+      { label: 'QA 로그', href: 'https://github.com/tiger-dreams/imin/blob/main/docs/release/agent_qa-2026-05-25-event-operations-controls.md' },
+    ],
+  },
+  {
     date: '2026-05-24',
     title: 'GSD 릴리즈 노트와 블로그 운영',
     summary: 'AI로 개발하는 팀이 안정적으로 확장할 수 있도록 제품/아키텍처/GSD 문서를 정리하고, 기능 변화를 웹에서 확인할 수 있는 공개 릴리즈 노트와 PMM 관점의 활용 아티클을 추가했습니다.',

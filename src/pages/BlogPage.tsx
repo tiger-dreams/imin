@@ -20,6 +20,7 @@ const sections = [
     title: '작은 밋업에서는 이렇게 씁니다',
     body: [
       '공개 행사 페이지를 만들고 신청을 받습니다. 신청자는 바로 참석자가 되는 것이 아니라 신청자 목록에 들어갑니다.',
+      '호스트는 접수 시작과 마감, 접수 한도, 정원 대비 초과 확정률을 먼저 정합니다. 신청자가 몰리는 행사는 접수 한도를 넓게 두고, 실제 좌석이나 운영 가능 인원은 확정 한도로 관리합니다.',
       '호스트는 신청자 목록을 보고 확정, 대기, 거절을 결정합니다. 이후 확정자에게 행사 며칠 전 RSVP 재확인을 요청합니다.',
       '행사 당일에는 실제 체크인한 사람만 참여자로 보고, 래플을 한다면 이 체크인된 사람만 대상으로 추첨합니다. 신청한 사람, 승인된 사람, 오겠다고 답한 사람, 실제 온 사람이 분리됩니다.',
     ],
@@ -128,6 +129,16 @@ export default function BlogPage() {
                 </li>
               ))}
             </ul>
+          </section>
+
+          <section className="rounded-3xl p-5 sm:p-7 mt-8" style={{ background: '#fffaf2', border: '1px solid #eadfcc' }}>
+            <h2 className="text-2xl font-black">노쇼가 예상되는 행사는 접수와 확정을 분리합니다</h2>
+            <p className="text-base sm:text-lg leading-8 mt-4" style={{ color: '#4d4034' }}>
+              정원 100명 행사의 신청을 100명에서 바로 닫으면, 실제 참석은 60-80명으로 떨어질 수 있습니다. imin에서는 접수 한도와 확정 한도를 분리합니다. 예를 들어 접수는 180명까지 받고, 확정은 정원의 120-130%까지만 승인하는 방식입니다.
+            </p>
+            <p className="text-base sm:text-lg leading-8 mt-4" style={{ color: '#4d4034' }}>
+              접수 시작과 마감도 별도로 두면 홍보 기간, 심사 기간, 참석 재확인 기간을 분리할 수 있습니다. 호스트와 관리자는 신청자 목록을 보고 확정, 대기, 거절을 처리하고, 일반 참가자는 이 운영 화면을 볼 수 없습니다.
+            </p>
           </section>
 
           <section className="rounded-3xl p-5 sm:p-7 mt-8" style={{ background: '#302820', color: '#fffaf2' }}>

@@ -26,6 +26,10 @@ interface EventRecord {
   geoLon?: number
   onlineUrl?: string
   capacity?: number
+  overbookingPercent?: number
+  applicationLimit?: number
+  applicationStartsAt?: string
+  applicationEndsAt?: string
   visibility: EventVisibility
   approvalMode: ApprovalMode
   dressCode?: string
@@ -83,6 +87,15 @@ const eventKey = (id: string) => `imin:event:${id}`
 const hostKey = (hostUserId: string) => `imin:events:host:${hostUserId}`
 const participationKey = (id: string) => `imin:event:${id}:participations`
 
+const adminUserIds = () =>
+  (process.env.IMIN_ADMIN_USER_IDS ?? '')
+    .split(',')
+    .map(id => id.trim())
+    .filter(Boolean)
+
+const canManageEvent = (event: EventRecord, userId: string) =>
+  !!userId && (event.hostUserId === userId || adminUserIds().includes(userId))
+
 function makeId(title: string) {
   const slug = title
     .toLowerCase()
@@ -119,6 +132,31 @@ async function statsFor(eventId: string) {
   return stats
 }
 
+async function activeApplicationCount(eventId: string) {
+  const rows = await cmd(['HVALS', participationKey(eventId)]) as string[] | null
+  let count = 0
+  for (const raw of rows ?? []) {
+    const participation = JSON.parse(raw) as { applicationStatus?: string }
+    if (!['rejected', 'cancelled'].includes(participation.applicationStatus ?? 'pending')) count += 1
+  }
+  return count
+}
+
+async function confirmedCount(eventId: string, excludingUserId?: string) {
+  const rows = await cmd(['HVALS', participationKey(eventId)]) as string[] | null
+  let count = 0
+  for (const raw of rows ?? []) {
+    const participation = JSON.parse(raw) as { userId?: string; applicationStatus?: string }
+    if (participation.userId !== excludingUserId && participation.applicationStatus === 'confirmed') count += 1
+  }
+  return count
+}
+
+function confirmationLimit(event: EventRecord) {
+  if (!event.capacity) return Number.POSITIVE_INFINITY
+  return Math.floor(event.capacity * Math.max(100, event.overbookingPercent ?? 100) / 100)
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -133,6 +171,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const hostUserId = text(req.query.hostUserId)
     const eventId = text(req.query.eventId)
     const userId = text(req.query.userId)
+    const requesterUserId = text(req.query.requesterUserId)
 
     if (action === 'participation' || action === 'rsvp') {
       if (!eventId) return res.status(400).json({ error: 'eventId required' })
@@ -143,6 +182,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const rows = await cmd(['HVALS', participationKey(eventId)]) as string[] | null
+      const eventRaw = await cmd(['GET', eventKey(eventId)]) as string | null
+      if (!eventRaw) return res.status(404).json({ error: 'Event not found' })
+      const event = JSON.parse(eventRaw) as EventRecord
+      if (!canManageEvent(event, requesterUserId)) return res.status(403).json({ error: 'Forbidden' })
       const participations = (rows ?? []).map(row => JSON.parse(row))
       return res.status(200).json({ participations, rsvps: participations })
     }
@@ -169,11 +212,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (body.action === 'participation' || body.action === 'rsvp') {
       const id = text(body.eventId)
       const uid = text(body.userId)
+      const actorUserId = text(body.actorUserId, uid)
       if (!id) return res.status(400).json({ error: 'eventId required' })
       if (!uid) return res.status(400).json({ error: 'userId required' })
 
       const eventExists = await cmd(['EXISTS', eventKey(id)]) as number
       if (!eventExists) return res.status(404).json({ error: 'Event not found' })
+      const eventRaw = await cmd(['GET', eventKey(id)]) as string | null
+      const event = eventRaw ? JSON.parse(eventRaw) as EventRecord : null
+      const isManager = !!event && canManageEvent(event, actorUserId)
+      if (uid !== actorUserId && !isManager) return res.status(403).json({ error: 'Forbidden' })
 
       const previousRaw = await cmd(['HGET', participationKey(id), uid]) as string | null
       const previous = previousRaw ? JSON.parse(previousRaw) as {
@@ -194,6 +242,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ['pending', 'confirmed', 'waitlisted', 'rejected', 'cancelled'] as const,
         previous?.applicationStatus ?? 'pending'
       ) as ApplicationStatus
+      if (event && !isManager) {
+        const allowedGuestStatus = event.approvalMode === 'auto' ? 'confirmed' : 'pending'
+        if (nextApplicationStatus !== (previous?.applicationStatus ?? allowedGuestStatus)) {
+          return res.status(403).json({ error: 'Only hosts or admins can change application status' })
+        }
+      }
       const rsvpStatus = body.rsvpStatus
         ? oneOf(body.rsvpStatus, ['attending', 'maybe', 'declined'] as const, 'attending') as RsvpStatus
         : previous?.rsvpStatus
@@ -213,6 +267,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         updatedAt: now,
         decidedAt: nextApplicationStatus !== previous?.applicationStatus ? now : previous?.decidedAt,
         rsvpUpdatedAt: body.rsvpStatus ? now : previous?.rsvpUpdatedAt,
+      }
+
+      const isNewApplication = !previous && ['pending', 'confirmed'].includes(nextApplicationStatus)
+      if (event && isNewApplication) {
+        const applicationStart = event.applicationStartsAt ? new Date(event.applicationStartsAt).getTime() : Number.NEGATIVE_INFINITY
+        const applicationEnd = event.applicationEndsAt ? new Date(event.applicationEndsAt).getTime() : Number.POSITIVE_INFINITY
+        if (Number.isFinite(applicationStart) && now < applicationStart) return res.status(409).json({ error: 'Application is not open yet' })
+        if (Number.isFinite(applicationEnd) && now > applicationEnd) return res.status(409).json({ error: 'Application is closed' })
+        if (event.applicationLimit && await activeApplicationCount(id) >= event.applicationLimit) return res.status(409).json({ error: 'Application limit reached' })
+      }
+      if (event && nextApplicationStatus === 'confirmed' && previous?.applicationStatus !== 'confirmed') {
+        if (await confirmedCount(id, uid) >= confirmationLimit(event)) return res.status(409).json({ error: 'Confirmation limit reached' })
       }
 
       await cmd(['HSET', participationKey(id), uid, JSON.stringify(participation)])
@@ -247,6 +313,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       address: text(body.address).slice(0, 240) || undefined,
       onlineUrl: optionalUrl(body.onlineUrl),
       capacity: Number.isFinite(Number(body.capacity)) && Number(body.capacity) > 0 ? Math.floor(Number(body.capacity)) : undefined,
+      overbookingPercent: Number.isFinite(Number(body.overbookingPercent)) && Number(body.overbookingPercent) >= 100
+        ? Math.min(200, Math.floor(Number(body.overbookingPercent)))
+        : 100,
+      applicationLimit: Number.isFinite(Number(body.applicationLimit)) && Number(body.applicationLimit) > 0 ? Math.floor(Number(body.applicationLimit)) : undefined,
+      applicationStartsAt: text(body.applicationStartsAt) || undefined,
+      applicationEndsAt: text(body.applicationEndsAt) || undefined,
       visibility,
       approvalMode: oneOf(body.approvalMode, ['auto', 'manual'] as const, 'auto'),
       dressCode: text(body.dressCode).slice(0, 160) || undefined,

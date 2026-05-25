@@ -24,6 +24,10 @@ export interface EventRecord {
   geoLon?: number
   onlineUrl?: string
   capacity?: number
+  overbookingPercent?: number
+  applicationLimit?: number
+  applicationStartsAt?: string
+  applicationEndsAt?: string
   visibility: EventVisibility
   approvalMode: ApprovalMode
   dressCode?: string
@@ -77,6 +81,10 @@ export interface EventFormState {
   address: string
   onlineUrl: string
   capacity: string
+  overbookingPercent: string
+  applicationLimit: string
+  applicationStartsAt: string
+  applicationEndsAt: string
   visibility: EventVisibility
   approvalMode: ApprovalMode
   dressCode: string

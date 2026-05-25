@@ -22,6 +22,10 @@ const DEFAULT_FORM: EventFormState = {
   address: '',
   onlineUrl: '',
   capacity: '',
+  overbookingPercent: '120',
+  applicationLimit: '',
+  applicationStartsAt: '',
+  applicationEndsAt: '',
   visibility: 'public',
   approvalMode: 'auto',
   dressCode: '',
@@ -39,6 +43,8 @@ const CATEGORY_PRESETS: Record<EventCategory, Partial<EventFormState>> = {
     venueName: '아름다운 정원 웨딩홀',
     address: '서울특별시 중구 세종대로 110',
     capacity: '120',
+    overbookingPercent: '110',
+    applicationLimit: '160',
     dressCode: '밝은 색감의 단정한 복장',
     giftNote: '축하의 마음만으로도 충분합니다.',
     contactNote: '참석 관련 문의는 신랑/신부에게 LINE으로 남겨주세요.',
@@ -52,6 +58,8 @@ const CATEGORY_PRESETS: Record<EventCategory, Partial<EventFormState>> = {
     venueName: '성수 루프 라운지',
     address: '서울특별시 성동구 성수이로 88',
     capacity: '60',
+    overbookingPercent: '120',
+    applicationLimit: '90',
     dressCode: '편한 파티룩',
     giftNote: '각자 마실 음료 하나씩 가져오면 좋아요.',
     contactNote: '늦게 도착하면 입구에서 주최자에게 메시지를 보내주세요.',
@@ -66,6 +74,8 @@ const CATEGORY_PRESETS: Record<EventCategory, Partial<EventFormState>> = {
     address: '서울특별시 강남구 테헤란로 123',
     onlineUrl: 'https://meet.example.com/imin-event',
     capacity: '100',
+    overbookingPercent: '130',
+    applicationLimit: '160',
     dressCode: '캐주얼',
     giftNote: '현장 참석자에게 네트워킹 음료가 제공됩니다.',
     contactNote: '발표자/스폰서 문의는 운영진에게 남겨주세요.',
@@ -79,6 +89,8 @@ const CATEGORY_PRESETS: Record<EventCategory, Partial<EventFormState>> = {
     venueName: '커뮤니티 라운지',
     address: '서울특별시 마포구 동교로 25길',
     capacity: '30',
+    overbookingPercent: '120',
+    applicationLimit: '45',
     dressCode: '편한 복장',
     giftNote: '간단한 다과가 준비됩니다.',
     contactNote: '자리가 좁아 동반 인원이 있으면 미리 알려주세요.',
@@ -87,7 +99,7 @@ const CATEGORY_PRESETS: Record<EventCategory, Partial<EventFormState>> = {
 
 const PRESET_KEYS: (keyof EventFormState)[] = [
   'title', 'description', 'coHostName', 'coverImageUrl', 'eventType', 'venueName', 'address',
-  'onlineUrl', 'capacity', 'dressCode', 'giftNote', 'contactNote',
+  'onlineUrl', 'capacity', 'overbookingPercent', 'applicationLimit', 'dressCode', 'giftNote', 'contactNote',
 ]
 
 const todayAt = (hour: number, minute = 0) => {
@@ -112,6 +124,8 @@ const SAMPLE_EVENTS: EventRecord[] = [
     venueName: 'Hackday 데모 라운지',
     address: '오늘 행사장',
     capacity: 30,
+    overbookingPercent: 120,
+    applicationLimit: 45,
     visibility: 'public',
     approvalMode: 'auto',
     dressCode: '현장 데모 확인용',
@@ -146,6 +160,8 @@ const SAMPLE_EVENTS: EventRecord[] = [
     venueName: '서울 교대역 인근 라운지',
     address: '참가 확정자에게 상세 주소를 안내합니다.',
     capacity: 80,
+    overbookingPercent: 130,
+    applicationLimit: 180,
     visibility: 'public',
     approvalMode: 'manual',
     dressCode: '캐주얼',
@@ -182,6 +198,14 @@ const DEFAULT_PROFILE_SETTINGS: ProfileSettings = {
 }
 
 const INTEREST_OPTIONS = ['밋업', '네트워킹', 'AI', '스타트업', '디자인', '개발', '웨딩', '파티', '컨퍼런스']
+
+const ADMIN_USER_IDS = ((import.meta.env.VITE_IMIN_ADMIN_USER_IDS as string | undefined) ?? '')
+  .split(',')
+  .map(id => id.trim())
+  .filter(Boolean)
+
+const canManageEvent = (event: EventRecord, userId?: string) =>
+  !!userId && (event.hostUserId === userId || ADMIN_USER_IDS.includes(userId))
 
 type Route =
   | { name: 'home' }
@@ -236,13 +260,14 @@ export default function EventPlatformPage() {
       const event = await fetchEvent(id)
       setSelected(event)
       if (profile?.userId) setMyParticipation(await fetchParticipation(id, profile.userId))
-      if (profile?.userId && event.hostUserId === profile.userId) setParticipations(await fetchParticipations(id))
+      if (canManageEvent(event, profile?.userId)) setParticipations(await fetchParticipations(id, profile?.userId))
+      else setParticipations([])
       setLoadState('ready')
     } catch {
       const event = [...readLocalEvents(), ...SAMPLE_EVENTS].find(item => item.id === id) ?? null
       setSelected(event)
       setMyParticipation(profile?.userId ? readLocalParticipation(id, profile.userId) : null)
-      setParticipations(event && profile?.userId === event.hostUserId ? readLocalParticipations(id) : [])
+      setParticipations(event && canManageEvent(event, profile?.userId) ? readLocalParticipations(id) : [])
       setLoadState(event ? 'ready' : 'error')
     }
   }, [profile?.userId])
@@ -271,24 +296,26 @@ export default function EventPlatformPage() {
           const next = await saveParticipation(selected.id, {
             ...payload,
             userId: profile.userId,
+            actorUserId: profile.userId,
             displayName: profile.displayName,
             pictureUrl: profile.pictureUrl,
           })
           setMyParticipation(next)
-          setParticipations(await safeReloadParticipations(selected.id))
+          setParticipations(canManageEvent(selected, profile.userId) ? await safeReloadParticipations(selected.id, profile.userId) : [])
           setSelected(await safeReloadEvent(selected.id, selected))
         }}
         onHostUpdate={async (target, applicationStatus) => {
-          if (!selected) return
+          if (!selected || !canManageEvent(selected, profile?.userId)) return
           await saveParticipation(selected.id, {
             userId: target.userId,
+            actorUserId: profile?.userId,
             displayName: target.displayName,
             pictureUrl: target.pictureUrl,
             applicationStatus,
             companions: target.companions,
             message: target.message ?? '',
           })
-          setParticipations(await safeReloadParticipations(selected.id))
+          setParticipations(await safeReloadParticipations(selected.id, profile?.userId))
           setSelected(await safeReloadEvent(selected.id, selected))
         }}
       />
@@ -615,8 +642,8 @@ function EventCreatePage({ onBack, onCreated }: { onBack: () => void; onCreated:
           <Field label={form.category === 'wedding' ? '신랑/신부 또는 공동 주최자' : '공동 주최자'}>
             <input value={form.coHostName} onChange={e => update('coHostName', e.target.value)} style={lightInput} placeholder="예: 지우" />
           </Field>
-          <Field label="초대 문구">
-            <textarea value={form.description} onChange={e => update('description', e.target.value)} style={{ ...lightInput, minHeight: 92, resize: 'vertical' }} placeholder="초대장에 보여줄 짧은 인사말" />
+          <Field label="행사 내용">
+            <textarea value={form.description} onChange={e => update('description', e.target.value)} style={{ ...lightInput, minHeight: 120, resize: 'vertical' }} placeholder="행사 목적, 진행 방식, 프로그램, 참가자가 알아야 할 핵심 내용을 적어주세요." />
           </Field>
           <Field label="대표 이미지 URL">
             <input value={form.coverImageUrl} onChange={e => update('coverImageUrl', e.target.value)} style={lightInput} placeholder="https://..." />
@@ -665,10 +692,32 @@ function EventCreatePage({ onBack, onCreated }: { onBack: () => void; onCreated:
         </FormBand>
 
         <FormBand title="참여와 승인 설정" icon={<Clipboard size={16} />}>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 min-w-0">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 min-w-0">
             <Field label="정원">
               <input inputMode="numeric" value={form.capacity} onChange={e => update('capacity', e.target.value.replace(/[^0-9]/g, ''))} style={lightInput} placeholder="예: 120" />
             </Field>
+            <Field label="초과 확정">
+              <select value={form.overbookingPercent} onChange={e => update('overbookingPercent', e.target.value)} style={lightInput}>
+                <option value="100">100%</option>
+                <option value="110">110%</option>
+                <option value="120">120%</option>
+                <option value="130">130%</option>
+                <option value="150">150%</option>
+              </select>
+            </Field>
+            <Field label="접수 한도">
+              <input inputMode="numeric" value={form.applicationLimit} onChange={e => update('applicationLimit', e.target.value.replace(/[^0-9]/g, ''))} style={lightInput} placeholder="예: 180" />
+            </Field>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+            <Field label="접수 시작">
+              <input type="datetime-local" value={form.applicationStartsAt} onChange={e => update('applicationStartsAt', e.target.value)} style={lightInput} />
+            </Field>
+            <Field label="접수 마감">
+              <input type="datetime-local" value={form.applicationEndsAt} onChange={e => update('applicationEndsAt', e.target.value)} style={lightInput} />
+            </Field>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
             <Field label="공개 여부">
               <select value={form.visibility} onChange={e => update('visibility', e.target.value as EventFormState['visibility'])} style={lightInput}>
                 <option value="public">공개</option>
@@ -767,12 +816,17 @@ function EventDetailPage({
   }
 
   const shareUrl = `${window.location.origin}/events/${event.id}`
-  const isHost = viewerUserId === event.hostUserId
+  const isManager = canManageEvent(event, viewerUserId)
   const isConfirmed = participation?.applicationStatus === 'confirmed'
-  const canCheckIn = event.eventType !== 'online' && (isHost || isConfirmed)
-  const canEnterOnline = !!event.onlineUrl && (isHost || isConfirmed)
+  const isCheckInDay = isEventDay(event)
+  const showCheckIn = event.eventType !== 'online' && isCheckInDay
+  const canCheckIn = showCheckIn && (isManager || isConfirmed)
+  const canEnterOnline = !!event.onlineUrl && (isManager || isConfirmed)
   const entryState = resolveOnlineEntryState(event)
+  const applicationState = resolveApplicationState(event)
+  const canApply = applicationState.state === 'open' && !saving
   const submitApplication = async () => {
+    if (!canApply) return
     setSaving(true)
     try {
       await onApply({
@@ -820,8 +874,8 @@ function EventDetailPage({
   }
 
   const enterOnline = async () => {
-    if (!event.onlineUrl || (!isHost && !isConfirmed)) return
-    if (!isHost) {
+    if (!event.onlineUrl || (!isManager && !isConfirmed)) return
+    if (!isManager) {
       await onApply({
         applicationStatus: 'confirmed',
         rsvpStatus: participation?.rsvpStatus,
@@ -880,7 +934,8 @@ function EventDetailPage({
 
       <main className="px-4 py-5 space-y-4 max-w-2xl mx-auto">
         <InviteBand>
-          <p className="text-center text-lg leading-8 font-medium whitespace-pre-wrap">{event.description}</p>
+          <p className="text-xs font-black mb-3" style={{ color: '#9b7654' }}>행사 내용</p>
+          <p className="text-lg leading-8 font-medium whitespace-pre-wrap">{event.description}</p>
         </InviteBand>
 
         <InfoBand title="일정" icon={<Clock size={16} />}>
@@ -908,13 +963,13 @@ function EventDetailPage({
                 style={{ background: canEnterOnline && entryState !== 'ended' ? '#302820' : '#eadfcc', color: canEnterOnline && entryState !== 'ended' ? '#fffaf2' : '#8d7a67' }}
               >
                 <ExternalLink size={14} />
-                {isHost ? '온라인 룸 열기' : isConfirmed ? '온라인 입장하고 출석 기록' : '참가 확정 후 입장 가능'}
+                {isManager ? '온라인 룸 열기' : isConfirmed ? '온라인 입장하고 출석 기록' : '참가 확정 후 입장 가능'}
               </button>
             </div>
           )}
         </InfoBand>
 
-        {event.eventType !== 'online' && (
+        {showCheckIn && (
           <InfoBand title="현장 체크인" icon={<CheckCircle size={16} />}>
             <p className="text-sm leading-6" style={{ color: '#6f5c4a' }}>
               {canCheckIn
@@ -941,31 +996,35 @@ function EventDetailPage({
           </InfoBand>
         )}
 
-        <InfoBand title={isHost ? '신청자 운영' : isConfirmed ? '참석 여부 재확인' : '참여 신청'} icon={<MessageCircle size={16} />}>
-          {isHost && (
+        <InfoBand title={isManager ? '신청자 운영' : isConfirmed ? '참석 여부 재확인' : '참여 신청'} icon={<MessageCircle size={16} />}>
+          {isManager && (
             <p className="text-sm leading-6" style={{ color: '#6f5c4a' }}>
-              주최자는 신청자 관리에서 참가 확정, 대기, 거절 상태를 처리합니다. 참석 여부 재확인은 참가 확정자에게만 열립니다.
+              호스트와 관리자는 신청자 관리에서 참가 확정, 대기, 거절 상태를 처리합니다. 참석 여부 재확인은 참가 확정자에게만 열립니다.
             </p>
           )}
 
-          {!isHost && !participation && (
+          {!isManager && !participation && (
             <>
               <p className="text-sm leading-6" style={{ color: '#6f5c4a' }}>
                 공개 행사는 먼저 참여 신청을 보내고, 주최자가 신청자 목록을 확인한 뒤 참가 확정 또는 대기 상태로 안내합니다.
               </p>
+              <div className="mt-3 rounded-2xl p-4" style={{ background: '#fffaf2', border: '1px solid #eadfcc' }}>
+                <p className="text-xs font-black" style={{ color: applicationState.state === 'open' ? '#16803a' : '#9b7654' }}>{applicationState.label}</p>
+                <p className="text-sm mt-1" style={{ color: '#6f5c4a' }}>{applicationState.description}</p>
+              </div>
               <div className="mt-3 grid grid-cols-[1fr_auto] gap-2 items-center">
                 <label className="text-sm font-bold" style={{ color: '#6f5c4a' }}>동반 인원</label>
                 <CompanionStepper value={companions} onChange={setCompanions} />
               </div>
               <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder="주최자에게 전할 신청 메시지" className="mt-3 w-full rounded-2xl p-4 text-sm" style={{ background: '#fffaf2', border: '1px solid #eadfcc', minHeight: 96, outline: 'none' }} />
-              <button onClick={submitApplication} disabled={saving} className="mt-3 w-full rounded-2xl py-4 font-black flex items-center justify-center gap-2" style={{ background: '#302820', color: '#fffaf2', opacity: saving ? 0.65 : 1 }}>
+              <button onClick={submitApplication} disabled={!canApply} className="mt-3 w-full rounded-2xl py-4 font-black flex items-center justify-center gap-2" style={{ background: canApply ? '#302820' : '#eadfcc', color: canApply ? '#fffaf2' : '#8d7a67', opacity: saving ? 0.65 : 1 }}>
                 {saving ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
-                {event.approvalMode === 'auto' ? '참여 신청하고 바로 확정' : '참여 신청 보내기'}
+                {applicationState.state === 'open' ? event.approvalMode === 'auto' ? '참여 신청하고 바로 확정' : '참여 신청 보내기' : applicationState.cta}
               </button>
             </>
           )}
 
-          {!isHost && participation && !isConfirmed && (
+          {!isManager && participation && !isConfirmed && (
             <div className="rounded-2xl p-4" style={{ background: '#fffaf2', border: '1px solid #eadfcc' }}>
               <p className="font-black">{applicationStatusLabel(participation.applicationStatus)}</p>
               <p className="text-sm mt-2 leading-6" style={{ color: '#6f5c4a' }}>
@@ -977,7 +1036,7 @@ function EventDetailPage({
             </div>
           )}
 
-          {!isHost && isConfirmed && (
+          {!isManager && isConfirmed && (
             <>
               <p className="text-sm leading-6" style={{ color: '#6f5c4a' }}>
                 참가가 확정됐어요. 행사 7-10일 전 재확인 요청을 받으면 이 응답으로 최종 참석 여부를 알려주세요.
@@ -1008,8 +1067,8 @@ function EventDetailPage({
           )}
         </InfoBand>
 
-        {isHost && (
-          <HostApplicantsPanel participations={participations} onUpdate={onHostUpdate} />
+        {isManager && (
+          <HostApplicantsPanel event={event} participations={participations} onUpdate={onHostUpdate} />
         )}
 
         <InfoBand title="공유 링크" icon={<LinkIcon size={16} />}>
@@ -1077,18 +1136,32 @@ function CompanionStepper({ value, onChange }: { value: number; onChange: (value
 }
 
 function HostApplicantsPanel({
+  event,
   participations,
   onUpdate,
 }: {
+  event: EventRecord
   participations: EventParticipation[]
   onUpdate: (target: EventParticipation, applicationStatus: ApplicationStatus) => Promise<void>
 }) {
   const sorted = [...participations].sort((a, b) => b.updatedAt - a.updatedAt)
+  const confirmedCount = participations.filter(item => item.applicationStatus === 'confirmed').length
+  const confirmationLimit = confirmationLimitFor(event)
   return (
     <InfoBand title="신청자 관리" icon={<Users size={16} />}>
       <p className="text-sm leading-6 mb-3" style={{ color: '#6f5c4a' }}>
         신청자를 확정하거나 대기자로 두면, 이후 참석 여부 재확인 응답을 받아 최종 인원을 조정할 수 있습니다.
       </p>
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <MiniStat label="정원" value={event.capacity ? `${event.capacity}명` : '미정'} />
+        <MiniStat label="초과 확정" value={`${event.overbookingPercent ?? 100}%`} />
+        <MiniStat label="확정 현황" value={event.capacity ? `${confirmedCount}/${confirmationLimit}명` : `${confirmedCount}명`} />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+        <MiniStat label="접수 한도" value={event.applicationLimit ? `${activeApplicationCountFor(event)} / ${event.applicationLimit}명` : '제한 없음'} />
+        <MiniStat label="접수 시작" value={event.applicationStartsAt ? formatDateShort(event.applicationStartsAt) : '즉시'} />
+        <MiniStat label="접수 마감" value={event.applicationEndsAt ? formatDateShort(event.applicationEndsAt) : '제한 없음'} />
+      </div>
       {sorted.length === 0 ? (
         <p className="text-sm rounded-2xl p-4 text-center" style={{ background: '#fffaf2', border: '1px solid #eadfcc', color: '#8d7a67' }}>아직 신청자가 없습니다</p>
       ) : (
@@ -1114,19 +1187,35 @@ function HostApplicantsPanel({
                   ['confirmed', '확정'],
                   ['waitlisted', '대기'],
                   ['rejected', '거절'],
-                ] as [ApplicationStatus, string][]).map(([status, label]) => (
+                ] as [ApplicationStatus, string][]).map(([status, label]) => {
+                  const overLimit = status === 'confirmed' &&
+                    applicant.applicationStatus !== 'confirmed' &&
+                    Number.isFinite(confirmationLimit) &&
+                    confirmedCount >= confirmationLimit
+                  return (
                   <button key={status} onClick={() => onUpdate(applicant, status)}
+                    disabled={overLimit}
                     className="rounded-2xl py-2 text-xs font-black"
-                    style={{ background: applicant.applicationStatus === status ? '#302820' : '#fbf8f2', color: applicant.applicationStatus === status ? '#fffaf2' : '#302820', border: '1px solid #eadfcc' }}>
-                    {label}
+                    style={{ background: applicant.applicationStatus === status ? '#302820' : '#fbf8f2', color: overLimit ? '#b8a894' : applicant.applicationStatus === status ? '#fffaf2' : '#302820', border: '1px solid #eadfcc', opacity: overLimit ? 0.55 : 1, cursor: overLimit ? 'not-allowed' : 'pointer' }}>
+                    {overLimit ? '한도 도달' : label}
                   </button>
-                ))}
+                  )
+                })}
               </div>
             </div>
           ))}
         </div>
       )}
     </InfoBand>
+  )
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl p-3" style={{ background: '#fbf8f2', border: '1px solid #eadfcc' }}>
+      <p className="text-[11px] font-black" style={{ color: '#9b7654' }}>{label}</p>
+      <p className="text-sm font-black mt-1">{value}</p>
+    </div>
   )
 }
 
@@ -1265,6 +1354,8 @@ async function createEvent(payload: EventFormState & { hostUserId: string; hostN
   const body = {
     ...payload,
     capacity: payload.capacity ? Number(payload.capacity) : undefined,
+    overbookingPercent: payload.overbookingPercent ? Number(payload.overbookingPercent) : undefined,
+    applicationLimit: payload.applicationLimit ? Number(payload.applicationLimit) : undefined,
     coverImageUrl: payload.coverImageUrl || undefined,
   }
   if (useLocalEventStore()) return createLocalEvent(payload)
@@ -1290,9 +1381,11 @@ async function fetchParticipation(eventId: string, userId: string) {
   return json.participation
 }
 
-async function fetchParticipations(eventId: string) {
+async function fetchParticipations(eventId: string, requesterUserId?: string) {
   if (useLocalEventStore()) return readLocalParticipations(eventId)
-  const res = await fetch(`/api/events?action=participation&eventId=${encodeURIComponent(eventId)}`, { cache: 'no-store' })
+  const query = new URLSearchParams({ action: 'participation', eventId })
+  if (requesterUserId) query.set('requesterUserId', requesterUserId)
+  const res = await fetch(`/api/events?${query.toString()}`, { cache: 'no-store' })
   if (!res.ok) return []
   const json = await res.json() as { participations: EventParticipation[] }
   return json.participations
@@ -1300,6 +1393,7 @@ async function fetchParticipations(eventId: string) {
 
 async function saveParticipation(eventId: string, payload: {
   userId: string
+  actorUserId?: string
   displayName: string
   pictureUrl?: string
   applicationStatus?: ApplicationStatus
@@ -1349,6 +1443,10 @@ function createLocalEvent(payload: EventFormState & { hostUserId: string; hostNa
     address: payload.address || undefined,
     onlineUrl: payload.onlineUrl || undefined,
     capacity: payload.capacity ? Number(payload.capacity) : undefined,
+    overbookingPercent: payload.overbookingPercent ? Number(payload.overbookingPercent) : 100,
+    applicationLimit: payload.applicationLimit ? Number(payload.applicationLimit) : undefined,
+    applicationStartsAt: payload.applicationStartsAt || undefined,
+    applicationEndsAt: payload.applicationEndsAt || undefined,
     visibility: payload.visibility,
     approvalMode: payload.approvalMode,
     dressCode: payload.dressCode || undefined,
@@ -1369,9 +1467,9 @@ async function safeReloadEvent(id: string, fallback: EventRecord) {
   }
 }
 
-async function safeReloadParticipations(id: string) {
+async function safeReloadParticipations(id: string, requesterUserId?: string) {
   try {
-    return await fetchParticipations(id)
+    return await fetchParticipations(id, requesterUserId)
   } catch {
     return readLocalParticipations(id)
   }
@@ -1546,6 +1644,68 @@ function onlineEntryStatusLabel(state: OnlineEntryState) {
     open: '온라인 입장 가능',
     ended: '온라인 행사가 종료됐어요',
   } as Record<OnlineEntryState, string>)[state]
+}
+
+function isEventDay(event: EventRecord) {
+  const start = new Date(event.startsAt)
+  if (Number.isNaN(start.getTime())) return false
+  const now = new Date()
+  return now.getFullYear() === start.getFullYear() &&
+    now.getMonth() === start.getMonth() &&
+    now.getDate() === start.getDate()
+}
+
+function confirmationLimitFor(event: EventRecord) {
+  if (!event.capacity) return Number.POSITIVE_INFINITY
+  const percent = Math.max(100, event.overbookingPercent ?? 100)
+  return Math.floor(event.capacity * percent / 100)
+}
+
+function activeApplicationCountFor(event: EventRecord) {
+  if (!event.stats) return 0
+  return event.stats.pending + event.stats.confirmed + event.stats.waitlisted
+}
+
+type ApplicationOpenState = 'before' | 'open' | 'closed' | 'full'
+
+function resolveApplicationState(event: EventRecord): { state: ApplicationOpenState; label: string; description: string; cta: string } {
+  const now = Date.now()
+  const startsAt = event.applicationStartsAt ? new Date(event.applicationStartsAt).getTime() : Number.NEGATIVE_INFINITY
+  const endsAt = event.applicationEndsAt ? new Date(event.applicationEndsAt).getTime() : Number.POSITIVE_INFINITY
+  const activeCount = activeApplicationCountFor(event)
+  if (event.applicationLimit && activeCount >= event.applicationLimit) {
+    return {
+      state: 'full',
+      label: '접수 한도 도달',
+      description: `${activeCount}/${event.applicationLimit}명이 접수되어 현재는 새 신청을 받을 수 없습니다.`,
+      cta: '접수 마감',
+    }
+  }
+  if (Number.isFinite(startsAt) && now < startsAt) {
+    return {
+      state: 'before',
+      label: '접수 전',
+      description: `${formatDate(event.applicationStartsAt ?? '')}부터 신청할 수 있습니다.`,
+      cta: '접수 전',
+    }
+  }
+  if (Number.isFinite(endsAt) && now > endsAt) {
+    return {
+      state: 'closed',
+      label: '접수 마감',
+      description: `${formatDate(event.applicationEndsAt ?? '')}에 접수가 마감되었습니다.`,
+      cta: '접수 마감',
+    }
+  }
+  return {
+    state: 'open',
+    label: event.applicationLimit ? `접수 가능 ${activeCount}/${event.applicationLimit}명` : '접수 가능',
+    description: [
+      event.applicationStartsAt ? `시작 ${formatDate(event.applicationStartsAt)}` : '지금 신청할 수 있습니다.',
+      event.applicationEndsAt ? `마감 ${formatDate(event.applicationEndsAt)}` : '',
+    ].filter(Boolean).join(' · '),
+    cta: '참여 신청',
+  }
 }
 
 function formatDate(value: string | number) {

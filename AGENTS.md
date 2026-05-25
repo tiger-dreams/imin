@@ -30,8 +30,10 @@ This file provides guidance to Codex when working in this repository.
 - Vercel Hobby plan allows no more than 12 serverless functions per deployment. This repository must keep `api/*.ts` at 12 files or fewer unless the project moves to a Pro team. Before adding a new API file, prefer merging related handlers into an existing function and route by query/body action.
 - Vercel environment variables must be configured in the Vercel dashboard for deployed behavior:
   - `VITE_LIFF_ID`
+  - `VITE_IMIN_ADMIN_USER_IDS`
   - `UPSTASH_REDIS_REST_URL`
   - `UPSTASH_REDIS_REST_TOKEN`
+  - `IMIN_ADMIN_USER_IDS`
   - `LINE_CHANNEL_SECRET`
   - `LINE_CHANNEL_ACCESS_TOKEN`
 
