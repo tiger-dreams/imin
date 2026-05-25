@@ -433,6 +433,13 @@ export default function EventPlatformPage() {
           await deleteEvent(selected.id, profile?.userId)
           navigate('/')
         }}
+        onVisibilityChange={async visibility => {
+          if (!selected || !canManageEvent(selected, profile?.userId)) return
+          const next = await updateEventVisibility(selected.id, visibility, profile?.userId)
+          setSelected(next)
+          setEvents(prev => mergeSampleEvents(prev.map(event => event.id === next.id ? next : event)))
+          setMyEvents(prev => prev.map(event => event.id === next.id ? next : event))
+        }}
       />
     )
   }
@@ -1033,7 +1040,7 @@ function EventCreatePage({ onBack, onCreated }: { onBack: () => void; onCreated:
 }
 
 function EventDetailPage({
-  event, participation, participations, viewerUserId, loadState, onBack, onNavigate, onApply, onHostUpdate, onDelete,
+  event, participation, participations, viewerUserId, loadState, onBack, onNavigate, onApply, onHostUpdate, onDelete, onVisibilityChange,
 }: {
   event: EventRecord | null
   participation: EventParticipation | null
@@ -1045,6 +1052,7 @@ function EventDetailPage({
   onApply: (payload: { applicationStatus?: ApplicationStatus; rsvpStatus?: RsvpStatus; companions: number; message: string; rsvpMessage?: string; onlineEnteredAt?: number; checkedInAt?: number }) => Promise<void>
   onHostUpdate: (target: EventParticipation, applicationStatus: ApplicationStatus) => Promise<void>
   onDelete: () => Promise<void>
+  onVisibilityChange: (visibility: EventRecord['visibility']) => Promise<void>
 }) {
   const [status, setStatus] = useState<RsvpStatus>(participation?.rsvpStatus ?? 'attending')
   const [companions, setCompanions] = useState(participation?.companions ?? 0)
@@ -1052,6 +1060,7 @@ function EventDetailPage({
   const [rsvpMessage, setRsvpMessage] = useState(participation?.rsvpMessage ?? '')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [visibilitySaving, setVisibilitySaving] = useState(false)
   const [shareDone, setShareDone] = useState(false)
 
   useEffect(() => {
@@ -1168,6 +1177,16 @@ function EventDetailPage({
       await onDelete()
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const toggleVisibility = async () => {
+    if (!isManager || visibilitySaving) return
+    setVisibilitySaving(true)
+    try {
+      await onVisibilityChange(event.visibility === 'public' ? 'private' : 'public')
+    } finally {
+      setVisibilitySaving(false)
     }
   }
 
@@ -1345,6 +1364,23 @@ function EventDetailPage({
         {isManager && (
           <InfoBand title="호스트 설정" icon={<Trash2 size={16} />}>
             <p className="text-sm leading-6" style={{ color: '#6f5c4a' }}>
+              점검 중에는 비공개로 전환해 공개 탐색에서 숨길 수 있습니다. 초대 링크를 가진 사람은 계속 상세를 열 수 있습니다.
+            </p>
+            <div className="mt-3 rounded-2xl p-4 flex items-center justify-between gap-3" style={{ background: '#fffaf2', border: '1px solid #eadfcc' }}>
+              <div>
+                <p className="text-xs font-black" style={{ color: '#9b7654' }}>공개 상태</p>
+                <p className="font-black mt-1">{event.visibility === 'public' ? '공개' : '비공개'}</p>
+              </div>
+              <button
+                onClick={toggleVisibility}
+                disabled={visibilitySaving}
+                className="rounded-2xl px-4 py-3 text-sm font-black"
+                style={{ background: event.visibility === 'public' ? '#f4eadc' : '#302820', color: event.visibility === 'public' ? '#6f5c4a' : '#fffaf2', opacity: visibilitySaving ? 0.65 : 1 }}
+              >
+                {visibilitySaving ? '저장 중' : event.visibility === 'public' ? '비공개 전환' : '공개 전환'}
+              </button>
+            </div>
+            <p className="text-sm leading-6 mt-4" style={{ color: '#6f5c4a' }}>
               테스트 행사나 잘못 만든 행사는 삭제할 수 있습니다. 삭제 후에는 초대장과 신청자 기록을 복구할 수 없습니다.
             </p>
             <button
@@ -1757,6 +1793,22 @@ async function deleteEvent(eventId: string, actorUserId?: string) {
   }
 }
 
+async function updateEventVisibility(eventId: string, visibility: EventRecord['visibility'], actorUserId?: string) {
+  if (useLocalEventStore()) return updateLocalEventVisibility(eventId, visibility)
+  try {
+    const res = await fetch('/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'visibility', eventId, visibility, actorUserId }),
+    })
+    if (!res.ok) throw new Error('visibility update failed')
+    const json = await res.json() as { event: EventRecord }
+    return json.event
+  } catch {
+    return updateLocalEventVisibility(eventId, visibility)
+  }
+}
+
 function useLocalEventStore() {
   return import.meta.env.DEV && ['localhost', '127.0.0.1'].includes(window.location.hostname)
 }
@@ -1827,6 +1879,15 @@ function writeLocalEvent(event: EventRecord) {
 function deleteLocalEvent(eventId: string) {
   localStorage.setItem(STORAGE_EVENTS, JSON.stringify(readLocalEvents().filter(item => item.id !== eventId)))
   localStorage.setItem(STORAGE_RSVPS, JSON.stringify(readLocalParticipations().filter(item => item.eventId !== eventId)))
+}
+
+function updateLocalEventVisibility(eventId: string, visibility: EventRecord['visibility']) {
+  const events = readLocalEvents()
+  const event = events.find(item => item.id === eventId)
+  if (!event) throw new Error('event unavailable')
+  const next = { ...event, visibility, updatedAt: Date.now() }
+  localStorage.setItem(STORAGE_EVENTS, JSON.stringify(events.map(item => item.id === eventId ? next : item)))
+  return next
 }
 
 function readLocalParticipations(eventId?: string) {

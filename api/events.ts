@@ -228,6 +228,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true })
     }
 
+    if (body.action === 'visibility') {
+      const id = text(body.eventId)
+      const actorUserId = text(body.actorUserId)
+      const visibility = oneOf(body.visibility, ['public', 'private'] as const, 'public')
+      if (!id) return res.status(400).json({ error: 'eventId required' })
+      if (!actorUserId) return res.status(400).json({ error: 'actorUserId required' })
+      const eventRaw = await cmd(['GET', eventKey(id)]) as string | null
+      if (!eventRaw) return res.status(404).json({ error: 'Event not found' })
+      const event = JSON.parse(eventRaw) as EventRecord
+      if (!canManageEvent(event, actorUserId)) return res.status(403).json({ error: 'Forbidden' })
+      const next = { ...event, visibility, updatedAt: Date.now() }
+      await pipeline([
+        ['SET', eventKey(id), JSON.stringify(next)],
+        visibility === 'public' ? ['SADD', PUBLIC_EVENTS_KEY, id] : ['SREM', PUBLIC_EVENTS_KEY, id],
+      ])
+      return res.status(200).json({ ok: true, event: next })
+    }
+
     if (body.action === 'participation' || body.action === 'rsvp') {
       const id = text(body.eventId)
       const uid = text(body.userId)
