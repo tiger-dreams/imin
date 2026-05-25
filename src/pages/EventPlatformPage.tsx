@@ -171,6 +171,105 @@ const SAMPLE_EVENTS: EventRecord[] = [
     updatedAt: Date.now() - 3600000,
     stats: { applied: 146, confirmed: 72, waitlisted: 28, pending: 46, rsvpAttending: 58, maybe: 9, declined: 5, total: 146 },
   },
+  {
+    id: 'sample-ai-product-sprint',
+    title: 'AI Product Sprint Seoul',
+    description: 'AI 제품을 만드는 PM, 디자이너, 빌더가 모여 실제 프로토타입과 성장 실험을 공유하는 저녁 밋업입니다.',
+    category: 'conference',
+    coverImageUrl: 'https://images.unsplash.com/photo-1559136555-9303baea8ebd?auto=format&fit=crop&w=1400&q=80',
+    hostUserId: 'sample-product-community',
+    hostName: 'Product Builders Club',
+    startsAt: '2026-06-12T19:00',
+    endsAt: '2026-06-12T21:30',
+    timezone: 'Asia/Seoul',
+    eventType: 'hybrid',
+    venueName: '성수 코워킹 스튜디오',
+    address: '서울 성동구 성수동',
+    onlineUrl: 'https://meet.example.com/ai-product-sprint',
+    capacity: 90,
+    overbookingPercent: 120,
+    applicationLimit: 140,
+    visibility: 'public',
+    approvalMode: 'manual',
+    dressCode: '캐주얼',
+    contactNote: '승인된 참가자에게 상세 장소와 온라인 링크를 안내합니다.',
+    createdAt: Date.now() - 7200000,
+    updatedAt: Date.now() - 7200000,
+    stats: { applied: 118, confirmed: 84, waitlisted: 12, pending: 22, rsvpAttending: 64, maybe: 11, declined: 4, total: 118 },
+  },
+  {
+    id: 'sample-design-systems-night',
+    title: 'Design Systems Night',
+    description: '디자인 시스템 운영, 컴포넌트 품질, 토큰 설계, PM/엔지니어 협업 방식을 다루는 소규모 네트워킹 세션입니다.',
+    category: 'meetup',
+    coverImageUrl: 'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=1400&q=80',
+    hostUserId: 'sample-design-host',
+    hostName: 'Design Ops Korea',
+    startsAt: '2026-06-20T18:30',
+    endsAt: '2026-06-20T21:00',
+    timezone: 'Asia/Seoul',
+    eventType: 'offline',
+    venueName: '홍대 디자인 라운지',
+    address: '서울 마포구 와우산로',
+    capacity: 40,
+    overbookingPercent: 125,
+    applicationLimit: 70,
+    visibility: 'public',
+    approvalMode: 'manual',
+    dressCode: '편한 복장',
+    contactNote: '포트폴리오나 사례 공유가 가능하면 신청 메시지에 남겨주세요.',
+    createdAt: Date.now() - 10800000,
+    updatedAt: Date.now() - 10800000,
+    stats: { applied: 63, confirmed: 38, waitlisted: 9, pending: 16, rsvpAttending: 32, maybe: 4, declined: 2, total: 63 },
+  },
+  {
+    id: 'sample-founder-coffee-chat',
+    title: 'Founder Coffee Chat',
+    description: '초기 스타트업 창업자와 예비 창업자가 고객 발견, 첫 유료 고객, 팀 빌딩을 주제로 이야기하는 아침 모임입니다.',
+    category: 'meetup',
+    coverImageUrl: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1400&q=80',
+    hostUserId: 'sample-founder-host',
+    hostName: 'Early Founders Seoul',
+    startsAt: '2026-06-27T09:30',
+    endsAt: '2026-06-27T11:30',
+    timezone: 'Asia/Seoul',
+    eventType: 'offline',
+    venueName: '강남 커피 클럽',
+    address: '서울 강남구 역삼동',
+    capacity: 24,
+    overbookingPercent: 130,
+    applicationLimit: 50,
+    visibility: 'public',
+    approvalMode: 'manual',
+    dressCode: '캐주얼',
+    giftNote: '커피와 간단한 브런치가 준비됩니다.',
+    createdAt: Date.now() - 14400000,
+    updatedAt: Date.now() - 14400000,
+    stats: { applied: 47, confirmed: 27, waitlisted: 8, pending: 12, rsvpAttending: 21, maybe: 3, declined: 1, total: 47 },
+  },
+  {
+    id: 'sample-webinar-growth-loop',
+    title: 'Growth Loop Webinar',
+    description: '커뮤니티와 제품 성장 루프를 연결하는 온라인 세션입니다. 라이브 참여자 Q&A와 presence 기반 래플을 함께 진행합니다.',
+    category: 'conference',
+    coverImageUrl: 'https://images.unsplash.com/photo-1591115765373-5207764f72e7?auto=format&fit=crop&w=1400&q=80',
+    hostUserId: 'sample-growth-host',
+    hostName: 'Growth Operators',
+    startsAt: '2026-07-03T20:00',
+    endsAt: '2026-07-03T21:30',
+    timezone: 'Asia/Seoul',
+    eventType: 'online',
+    onlineUrl: 'https://meet.example.com/growth-loop',
+    capacity: 300,
+    overbookingPercent: 150,
+    applicationLimit: 500,
+    visibility: 'public',
+    approvalMode: 'auto',
+    contactNote: '라이브 접속과 Q&A 참여 기록을 기반으로 래플 대상자를 정합니다.',
+    createdAt: Date.now() - 18000000,
+    updatedAt: Date.now() - 18000000,
+    stats: { applied: 238, confirmed: 238, waitlisted: 0, pending: 0, rsvpAttending: 171, maybe: 25, declined: 12, total: 238 },
+  },
 ]
 
 const STORAGE_EVENTS = 'imin:events:local'
@@ -209,6 +308,7 @@ const canManageEvent = (event: EventRecord, userId?: string) =>
 
 type Route =
   | { name: 'home' }
+  | { name: 'explore' }
   | { name: 'new' }
   | { name: 'detail'; id: string }
 
@@ -221,6 +321,7 @@ export default function EventPlatformPage() {
   const [myEvents, setMyEvents] = useState<EventRecord[]>([])
   const [selected, setSelected] = useState<EventRecord | null>(null)
   const [myParticipation, setMyParticipation] = useState<EventParticipation | null>(null)
+  const [homeParticipations, setHomeParticipations] = useState<Record<string, EventParticipation | null>>({})
   const [participations, setParticipations] = useState<EventParticipation[]>([])
   const [loadState, setLoadState] = useState<LoadState>('idle')
 
@@ -245,11 +346,18 @@ export default function EventPlatformPage() {
       ])
       setEvents(publicEvents)
       setMyEvents(mine)
+      if (profile?.userId) {
+        const rows = await Promise.all(publicEvents.map(async event => [event.id, await fetchParticipation(event.id, profile.userId)] as const))
+        setHomeParticipations(Object.fromEntries(rows))
+      } else {
+        setHomeParticipations({})
+      }
       setLoadState('ready')
     } catch {
       const local = readLocalEvents()
       setEvents(local.length ? local : SAMPLE_EVENTS)
       setMyEvents(profile?.userId ? local.filter(event => event.hostUserId === profile.userId) : [])
+      setHomeParticipations(profile?.userId ? Object.fromEntries(readLocalParticipations().map(row => [row.eventId, row])) : {})
       setLoadState('ready')
     }
   }, [profile?.userId])
@@ -273,7 +381,7 @@ export default function EventPlatformPage() {
   }, [profile?.userId])
 
   useEffect(() => {
-    if (route.name === 'home') refreshHome()
+    if (route.name === 'home' || route.name === 'explore') refreshHome()
     if (route.name === 'detail') refreshDetail(route.id)
   }, [route, refreshHome, refreshDetail])
 
@@ -322,10 +430,27 @@ export default function EventPlatformPage() {
     )
   }
 
+  if (route.name === 'explore') {
+    return (
+      <EventExplorePage
+        events={events.length ? events : SAMPLE_EVENTS}
+        myEvents={myEvents}
+        participations={homeParticipations}
+        viewerUserId={profile?.userId}
+        loadState={loadState}
+        onBack={() => navigate('/')}
+        onNavigate={navigate}
+        onRefresh={refreshHome}
+      />
+    )
+  }
+
   return (
     <EventHomePage
       events={events}
       myEvents={myEvents}
+      participations={homeParticipations}
+      viewerUserId={profile?.userId}
       loadState={loadState}
       onNavigate={navigate}
       onRefresh={refreshHome}
@@ -337,10 +462,12 @@ export default function EventPlatformPage() {
 }
 
 function EventHomePage({
-  events, myEvents, loadState, profileName, profilePictureUrl, onNavigate, onRefresh, onLogout,
+  events, myEvents, participations, viewerUserId, loadState, profileName, profilePictureUrl, onNavigate, onRefresh, onLogout,
 }: {
   events: EventRecord[]
   myEvents: EventRecord[]
+  participations: Record<string, EventParticipation | null>
+  viewerUserId?: string
   loadState: LoadState
   profileName: string
   profilePictureUrl?: string
@@ -349,6 +476,8 @@ function EventHomePage({
   onLogout: () => void
 }) {
   const [showProfile, setShowProfile] = useState(false)
+  const publicEvents = events.length ? events : SAMPLE_EVENTS
+  const featuredEvents = publicEvents.slice(0, 4)
 
   return (
     <div className="min-h-dvh" style={{ background: '#faf7f1', color: '#2f2923' }}>
@@ -397,12 +526,34 @@ function EventHomePage({
 
         {myEvents.length > 0 && (
           <EventSection title="내가 만든 행사" action="새로고침" onAction={onRefresh}>
-            {myEvents.map(event => <EventCard key={event.id} event={event} onClick={() => onNavigate(`/events/${event.id}`)} />)}
+            <div className="grid grid-cols-2 gap-3">
+              {myEvents.slice(0, 4).map(event => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  viewerUserId={viewerUserId}
+                  participation={participations[event.id]}
+                  compact
+                  onClick={() => onNavigate(`/events/${event.id}`)}
+                />
+              ))}
+            </div>
           </EventSection>
         )}
 
-        <EventSection title="공개 행사" action={loadState === 'loading' ? '불러오는 중' : '새로고침'} onAction={onRefresh}>
-          {(events.length ? events : SAMPLE_EVENTS).map(event => <EventCard key={event.id} event={event} onClick={() => onNavigate(`/events/${event.id}`)} />)}
+        <EventSection title="공개 행사" action={loadState === 'loading' ? '불러오는 중' : '더보기'} onAction={() => onNavigate('/events/explore')}>
+          <div className="grid grid-cols-2 gap-3">
+            {featuredEvents.map(event => (
+              <EventCard
+                key={event.id}
+                event={event}
+                viewerUserId={viewerUserId}
+                participation={participations[event.id]}
+                compact
+                onClick={() => onNavigate(`/events/${event.id}`)}
+              />
+            ))}
+          </div>
         </EventSection>
 
         <a href="/release" className="w-full rounded-2xl p-4 text-left flex items-center gap-3" style={{ background: '#fffaf2', border: '1px solid #eadfcc', textDecoration: 'none', color: 'inherit' }}>
@@ -424,6 +575,72 @@ function EventHomePage({
           onLogout={onLogout}
         />
       )}
+    </div>
+  )
+}
+
+function EventExplorePage({
+  events, myEvents, participations, viewerUserId, loadState, onBack, onNavigate, onRefresh,
+}: {
+  events: EventRecord[]
+  myEvents: EventRecord[]
+  participations: Record<string, EventParticipation | null>
+  viewerUserId?: string
+  loadState: LoadState
+  onBack: () => void
+  onNavigate: (path: string) => void
+  onRefresh: () => void
+}) {
+  const sortedEvents = [...events].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
+  return (
+    <div className="min-h-dvh" style={{ background: '#faf7f1', color: '#2f2923' }}>
+      <header className="sticky top-0 z-10 px-4 py-3 flex items-center gap-3" style={{ background: 'rgba(250,247,241,0.94)', backdropFilter: 'blur(14px)', borderBottom: '1px solid #eadfcc' }}>
+        <button onClick={onBack} className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: '#fffaf2', border: '1px solid #eadfcc' }}>
+          <ArrowLeft size={18} />
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-black" style={{ color: '#9b7654' }}>Explore</p>
+          <h1 className="font-black leading-tight">행사 둘러보기</h1>
+        </div>
+        <button onClick={onRefresh} className="rounded-full px-3 py-2 text-xs font-black" style={{ background: '#302820', color: '#fffaf2' }}>
+          {loadState === 'loading' ? '로딩' : '새로고침'}
+        </button>
+      </header>
+
+      <main className="px-4 py-5 max-w-4xl mx-auto space-y-5">
+        <section>
+          <h2 className="font-black px-1 mb-3">추천 행사</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {sortedEvents.map(event => (
+              <EventCard
+                key={event.id}
+                event={event}
+                viewerUserId={viewerUserId}
+                participation={participations[event.id]}
+                compact
+                onClick={() => onNavigate(`/events/${event.id}`)}
+              />
+            ))}
+          </div>
+        </section>
+
+        {myEvents.length > 0 && (
+          <section>
+            <h2 className="font-black px-1 mb-3">내가 호스트인 행사</h2>
+            <div className="space-y-3">
+              {myEvents.map(event => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  viewerUserId={viewerUserId}
+                  participation={participations[event.id]}
+                  onClick={() => onNavigate(`/events/${event.id}`)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+      </main>
     </div>
   )
 }
@@ -1103,26 +1320,53 @@ function CreatePreview({ form, hostName }: { form: EventFormState; hostName: str
   )
 }
 
-function EventCard({ event, onClick }: { event: EventRecord; onClick: () => void }) {
+function EventCard({
+  event, participation, viewerUserId, compact = false, onClick,
+}: {
+  event: EventRecord
+  participation?: EventParticipation | null
+  viewerUserId?: string
+  compact?: boolean
+  onClick: () => void
+}) {
+  const badge = eventCardBadge(event, participation, viewerUserId)
   return (
     <button onClick={onClick} className="w-full rounded-3xl overflow-hidden text-left" style={{ background: '#fffaf2', border: '1px solid #eadfcc' }}>
-      <div className="h-36 relative">
+      <div className={`${compact ? 'h-28' : 'h-36'} relative`}>
         {event.coverImageUrl ? <img src={event.coverImageUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full" style={{ background: 'linear-gradient(135deg, #d9b99b, #fff7ea)' }} />}
         <div className="absolute left-3 top-3 rounded-full px-3 py-1 text-xs font-black" style={{ background: 'rgba(255,250,242,0.92)', color: '#302820' }}>{categoryLabel(event.category)}</div>
+        {badge && (
+          <div className="absolute right-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-black" style={{ background: badge.background, color: badge.color }}>
+            {badge.label}
+          </div>
+        )}
       </div>
-      <div className="p-4">
-        <h3 className="font-black text-lg">{event.title}</h3>
-        <p className="text-sm mt-1 line-clamp-2" style={{ color: '#7a6754' }}>{event.description}</p>
-        <div className="grid grid-cols-2 gap-2 mt-4 text-xs">
+      <div className={compact ? 'p-3' : 'p-4'}>
+        <h3 className={`${compact ? 'text-sm min-h-[40px]' : 'text-lg'} font-black leading-tight line-clamp-2`}>{event.title}</h3>
+        {!compact && <p className="text-sm mt-1 line-clamp-2" style={{ color: '#7a6754' }}>{event.description}</p>}
+        <div className={`${compact ? 'grid-cols-1 mt-3' : 'grid-cols-2 mt-4'} grid gap-2 text-xs`}>
           <SmallPill icon={<CalendarDays size={12} />} label={formatDateShort(event.startsAt)} />
           <SmallPill icon={<MapPin size={12} />} label={event.venueName || eventTypeLabel(event.eventType)} />
         </div>
-        {event.stats && (
+        {!compact && event.stats && (
           <p className="text-xs font-bold mt-3" style={{ color: '#16803a' }}>{event.stats.confirmed}명 참가 확정 · {event.stats.pending}명 검토 중</p>
         )}
       </div>
     </button>
   )
+}
+
+function eventCardBadge(event: EventRecord, participation?: EventParticipation | null, viewerUserId?: string) {
+  if (canManageEvent(event, viewerUserId)) return { label: 'Host', background: '#302820', color: '#fffaf2' }
+  if (!participation) return null
+  const style = {
+    pending: { label: '신청중', background: '#fef3c7', color: '#92400e' },
+    confirmed: { label: '참가 확정', background: '#dcfce7', color: '#166534' },
+    waitlisted: { label: '대기', background: '#e0f2fe', color: '#075985' },
+    rejected: { label: '거절', background: '#fee2e2', color: '#991b1b' },
+    cancelled: { label: '취소', background: '#f4eadc', color: '#6f5c4a' },
+  } as Record<ApplicationStatus, { label: string; background: string; color: string }>
+  return style[participation.applicationStatus]
 }
 
 function CompanionStepper({ value, onChange }: { value: number; onChange: (value: number) => void }) {
@@ -1321,6 +1565,7 @@ function resolveRoute(): Route {
   const path = window.location.pathname
   const detail = path.match(/^\/events\/([^/]+)$/)
   if (path === '/events/new') return { name: 'new' }
+  if (path === '/events/explore') return { name: 'explore' }
   if (detail) return { name: 'detail', id: decodeURIComponent(detail[1]) }
   return { name: 'home' }
 }
