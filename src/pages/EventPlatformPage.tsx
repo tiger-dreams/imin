@@ -592,6 +592,14 @@ function EventExplorePage({
   onRefresh: () => void
 }) {
   const sortedEvents = [...events].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
+  const [tab, setTab] = useState<EventExploreTab>('open')
+  const filteredEvents = sortedEvents.filter(event => eventMatchesExploreTab(event, tab))
+  const tabItems: { key: EventExploreTab; label: string; count: number }[] = [
+    { key: 'open', label: '접수중', count: sortedEvents.filter(event => eventMatchesExploreTab(event, 'open')).length },
+    { key: 'upcoming', label: '예정', count: sortedEvents.filter(event => eventMatchesExploreTab(event, 'upcoming')).length },
+    { key: 'past', label: '지난 행사', count: sortedEvents.filter(event => eventMatchesExploreTab(event, 'past')).length },
+    { key: 'all', label: '전체', count: sortedEvents.length },
+  ]
   return (
     <div className="min-h-dvh" style={{ background: '#faf7f1', color: '#2f2923' }}>
       <header className="sticky top-0 z-10 px-4 py-3 flex items-center gap-3" style={{ background: 'rgba(250,247,241,0.94)', backdropFilter: 'blur(14px)', borderBottom: '1px solid #eadfcc' }}>
@@ -609,19 +617,45 @@ function EventExplorePage({
 
       <main className="px-4 py-5 max-w-4xl mx-auto space-y-5">
         <section>
-          <h2 className="font-black px-1 mb-3">추천 행사</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {sortedEvents.map(event => (
-              <EventCard
-                key={event.id}
-                event={event}
-                viewerUserId={viewerUserId}
-                participation={participations[event.id]}
-                compact
-                onClick={() => onNavigate(`/events/${event.id}`)}
-              />
+          <div className="flex items-center justify-between gap-3 px-1 mb-3">
+            <h2 className="font-black">추천 행사</h2>
+            <p className="text-xs font-bold" style={{ color: '#8d7a67' }}>{filteredEvents.length}개</p>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-3">
+            {tabItems.map(item => (
+              <button
+                key={item.key}
+                onClick={() => setTab(item.key)}
+                className="shrink-0 rounded-full px-3 py-2 text-xs font-black"
+                style={{
+                  background: tab === item.key ? '#302820' : '#fffaf2',
+                  color: tab === item.key ? '#fffaf2' : '#6f5c4a',
+                  border: '1px solid #eadfcc',
+                }}
+              >
+                {item.label} {item.count}
+              </button>
             ))}
           </div>
+          {filteredEvents.length === 0 ? (
+            <div className="rounded-3xl p-6 text-center" style={{ background: '#fffaf2', border: '1px solid #eadfcc', color: '#8d7a67' }}>
+              <p className="font-black">해당 상태의 행사가 없습니다</p>
+              <p className="text-sm mt-2">다른 탭을 선택해 보세요.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {filteredEvents.map(event => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  viewerUserId={viewerUserId}
+                  participation={participations[event.id]}
+                  compact
+                  onClick={() => onNavigate(`/events/${event.id}`)}
+                />
+              ))}
+            </div>
+          )}
         </section>
 
         {myEvents.length > 0 && (
@@ -1912,6 +1946,17 @@ function activeApplicationCountFor(event: EventRecord) {
 }
 
 type ApplicationOpenState = 'before' | 'open' | 'closed' | 'full'
+type EventExploreTab = 'open' | 'upcoming' | 'past' | 'all'
+
+function eventMatchesExploreTab(event: EventRecord, tab: EventExploreTab) {
+  if (tab === 'all') return true
+  const now = Date.now()
+  const start = new Date(event.startsAt).getTime()
+  const end = event.endsAt ? new Date(event.endsAt).getTime() : start
+  if (tab === 'past') return Number.isFinite(end) && end < now
+  if (tab === 'upcoming') return Number.isFinite(start) && start >= now && resolveApplicationState(event).state !== 'open'
+  return resolveApplicationState(event).state === 'open' && (!Number.isFinite(end) || end >= now)
+}
 
 function resolveApplicationState(event: EventRecord): { state: ApplicationOpenState; label: string; description: string; cta: string } {
   const now = Date.now()
