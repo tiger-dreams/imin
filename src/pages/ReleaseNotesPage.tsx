@@ -21,6 +21,8 @@ const RELEASES: ReleaseNote[] = [
       '정원 대비 100-150% 초과 확정률 설정과 확정 한도 표시',
       '접수 한도, 접수 시작, 접수 마감 설정 추가',
       '중요 본문 입력을 `행사 내용`으로 명확화',
+      '호스트/관리자 행사 삭제 기능 추가',
+      '목 행사 노출을 `VITE_SHOW_SAMPLE_EVENTS` 플래그로 제어',
       'API에서 신청자 목록 조회, 신규 신청 기간/한도, 확정 한도 검증 강화',
     ],
     checks: ['npm run build', 'git diff --check', 'Playwright 행사 생성/상세 QA', 'API 함수 수 12개 유지'],

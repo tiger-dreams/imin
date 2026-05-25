@@ -31,6 +31,7 @@ This file provides guidance to Codex when working in this repository.
 - Vercel environment variables must be configured in the Vercel dashboard for deployed behavior:
   - `VITE_LIFF_ID`
   - `VITE_IMIN_ADMIN_USER_IDS`
+  - `VITE_SHOW_SAMPLE_EVENTS`
   - `UPSTASH_REDIS_REST_URL`
   - `UPSTASH_REDIS_REST_TOKEN`
   - `IMIN_ADMIN_USER_IDS`

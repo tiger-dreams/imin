@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowLeft, CalendarDays, CheckCircle, Clipboard, Clock, Copy, ExternalLink, Gift,
   GitBranch, Heart, Home, Link as LinkIcon, Loader2, LogOut, MapPin, MessageCircle,
-  MonitorPlay, Plus, Send, Share2, Sparkles, Ticket, UserRound, Users,
+  MonitorPlay, Plus, Send, Share2, Sparkles, Ticket, Trash2, UserRound, Users,
 } from 'lucide-react'
 import liff from '@line/liff'
 import { useLiff } from '../contexts/LiffContext'
@@ -306,6 +306,8 @@ const ADMIN_USER_IDS = ((import.meta.env.VITE_IMIN_ADMIN_USER_IDS as string | un
 const canManageEvent = (event: EventRecord, userId?: string) =>
   !!userId && (event.hostUserId === userId || ADMIN_USER_IDS.includes(userId))
 
+const SHOW_SAMPLE_EVENTS = ((import.meta.env.VITE_SHOW_SAMPLE_EVENTS as string | undefined) ?? 'true') !== 'false'
+
 type Route =
   | { name: 'home' }
   | { name: 'explore' }
@@ -355,7 +357,7 @@ export default function EventPlatformPage() {
       setLoadState('ready')
     } catch {
       const local = readLocalEvents()
-      setEvents(local.length ? local : SAMPLE_EVENTS)
+      setEvents(mergeSampleEvents(local))
       setMyEvents(profile?.userId ? local.filter(event => event.hostUserId === profile.userId) : [])
       setHomeParticipations(profile?.userId ? Object.fromEntries(readLocalParticipations().map(row => [row.eventId, row])) : {})
       setLoadState('ready')
@@ -425,6 +427,11 @@ export default function EventPlatformPage() {
           })
           setParticipations(await safeReloadParticipations(selected.id, profile?.userId))
           setSelected(await safeReloadEvent(selected.id, selected))
+        }}
+        onDelete={async () => {
+          if (!selected || !canManageEvent(selected, profile?.userId)) return
+          await deleteEvent(selected.id, profile?.userId)
+          navigate('/')
         }}
       />
     )
@@ -1026,7 +1033,7 @@ function EventCreatePage({ onBack, onCreated }: { onBack: () => void; onCreated:
 }
 
 function EventDetailPage({
-  event, participation, participations, viewerUserId, loadState, onBack, onNavigate, onApply, onHostUpdate,
+  event, participation, participations, viewerUserId, loadState, onBack, onNavigate, onApply, onHostUpdate, onDelete,
 }: {
   event: EventRecord | null
   participation: EventParticipation | null
@@ -1037,12 +1044,14 @@ function EventDetailPage({
   onNavigate: (path: string) => void
   onApply: (payload: { applicationStatus?: ApplicationStatus; rsvpStatus?: RsvpStatus; companions: number; message: string; rsvpMessage?: string; onlineEnteredAt?: number; checkedInAt?: number }) => Promise<void>
   onHostUpdate: (target: EventParticipation, applicationStatus: ApplicationStatus) => Promise<void>
+  onDelete: () => Promise<void>
 }) {
   const [status, setStatus] = useState<RsvpStatus>(participation?.rsvpStatus ?? 'attending')
   const [companions, setCompanions] = useState(participation?.companions ?? 0)
   const [message, setMessage] = useState(participation?.message ?? '')
   const [rsvpMessage, setRsvpMessage] = useState(participation?.rsvpMessage ?? '')
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [shareDone, setShareDone] = useState(false)
 
   useEffect(() => {
@@ -1149,6 +1158,17 @@ function EventDetailPage({
     }))
     window.history.pushState({}, '', '/checkin')
     window.dispatchEvent(new PopStateEvent('popstate'))
+  }
+
+  const deleteThisEvent = async () => {
+    if (!isManager || deleting) return
+    if (!window.confirm('이 행사를 삭제할까요? 신청자 기록도 함께 삭제됩니다.')) return
+    setDeleting(true)
+    try {
+      await onDelete()
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
@@ -1320,6 +1340,23 @@ function EventDetailPage({
 
         {isManager && (
           <HostApplicantsPanel event={event} participations={participations} onUpdate={onHostUpdate} />
+        )}
+
+        {isManager && (
+          <InfoBand title="호스트 설정" icon={<Trash2 size={16} />}>
+            <p className="text-sm leading-6" style={{ color: '#6f5c4a' }}>
+              테스트 행사나 잘못 만든 행사는 삭제할 수 있습니다. 삭제 후에는 초대장과 신청자 기록을 복구할 수 없습니다.
+            </p>
+            <button
+              onClick={deleteThisEvent}
+              disabled={deleting}
+              className="mt-3 w-full rounded-2xl py-4 font-black flex items-center justify-center gap-2"
+              style={{ background: '#fff1f2', color: '#be123c', border: '1px solid #fecdd3', opacity: deleting ? 0.65 : 1 }}
+            >
+              {deleting ? <Loader2 size={17} className="animate-spin" /> : <Trash2 size={17} />}
+              {deleting ? '삭제 중...' : '내가 만든 행사 삭제'}
+            </button>
+          </InfoBand>
         )}
 
         <InfoBand title="공유 링크" icon={<LinkIcon size={16} />}>
@@ -1608,13 +1645,19 @@ async function fetchEvents(hostUserId?: string) {
   if (useLocalEventStore()) {
     const local = readLocalEvents()
     if (hostUserId) return local.filter(event => event.hostUserId === hostUserId)
-    return local.length ? local : SAMPLE_EVENTS
+    return mergeSampleEvents(local)
   }
   const url = hostUserId ? `/api/events?hostUserId=${encodeURIComponent(hostUserId)}` : '/api/events'
   const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) throw new Error('events unavailable')
   const json = await res.json() as { events: EventRecord[] }
-  return json.events
+  return hostUserId ? json.events : mergeSampleEvents(json.events)
+}
+
+function mergeSampleEvents(events: EventRecord[]) {
+  if (!SHOW_SAMPLE_EVENTS) return events
+  const ids = new Set(events.map(event => event.id))
+  return [...events, ...SAMPLE_EVENTS.filter(event => !ids.has(event.id))]
 }
 
 async function fetchEvent(id: string) {
@@ -1700,6 +1743,20 @@ async function saveParticipation(eventId: string, payload: {
   }
 }
 
+async function deleteEvent(eventId: string, actorUserId?: string) {
+  if (useLocalEventStore()) return deleteLocalEvent(eventId)
+  try {
+    const res = await fetch('/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', eventId, actorUserId }),
+    })
+    if (!res.ok) throw new Error('delete failed')
+  } catch {
+    deleteLocalEvent(eventId)
+  }
+}
+
 function useLocalEventStore() {
   return import.meta.env.DEV && ['localhost', '127.0.0.1'].includes(window.location.hostname)
 }
@@ -1765,6 +1822,11 @@ function readLocalEvents() {
 function writeLocalEvent(event: EventRecord) {
   const events = readLocalEvents().filter(item => item.id !== event.id)
   localStorage.setItem(STORAGE_EVENTS, JSON.stringify([event, ...events].slice(0, 50)))
+}
+
+function deleteLocalEvent(eventId: string) {
+  localStorage.setItem(STORAGE_EVENTS, JSON.stringify(readLocalEvents().filter(item => item.id !== eventId)))
+  localStorage.setItem(STORAGE_RSVPS, JSON.stringify(readLocalParticipations().filter(item => item.eventId !== eventId)))
 }
 
 function readLocalParticipations(eventId?: string) {

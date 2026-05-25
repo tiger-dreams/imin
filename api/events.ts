@@ -209,6 +209,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'POST') {
     const body = req.body as Record<string, unknown>
+    if (body.action === 'delete') {
+      const id = text(body.eventId)
+      const actorUserId = text(body.actorUserId)
+      if (!id) return res.status(400).json({ error: 'eventId required' })
+      if (!actorUserId) return res.status(400).json({ error: 'actorUserId required' })
+      const eventRaw = await cmd(['GET', eventKey(id)]) as string | null
+      if (!eventRaw) return res.status(404).json({ error: 'Event not found' })
+      const event = JSON.parse(eventRaw) as EventRecord
+      if (!canManageEvent(event, actorUserId)) return res.status(403).json({ error: 'Forbidden' })
+      await pipeline([
+        ['DEL', eventKey(id)],
+        ['DEL', participationKey(id)],
+        ['SREM', hostKey(event.hostUserId), id],
+        ['SREM', PUBLIC_EVENTS_KEY, id],
+        ['LREM', RECENT_EVENTS_KEY, 0, id],
+      ])
+      return res.status(200).json({ ok: true })
+    }
+
     if (body.action === 'participation' || body.action === 'rsvp') {
       const id = text(body.eventId)
       const uid = text(body.userId)
